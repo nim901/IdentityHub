@@ -1,6 +1,6 @@
 # IdentityHub
 
-IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides account registration, sign-in and sign-out, server-side sessions, and a health endpoint. Jira integration, ticket creation, API keys, and the AI digest are planned but **not implemented or verified** yet.
+IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides account registration, sign-in and sign-out, server-side sessions, a health endpoint, and initial Jira OAuth state handling. A usable Jira connection, ticket creation, API keys, and the AI digest are **not implemented or verified** yet.
 
 ## Requirements
 
@@ -82,7 +82,7 @@ To run tests inside Docker, including rebuilding the test image after changes:
 docker compose --profile test run --build --rm test
 ```
 
-Server tests use an in-memory SQLite database; browser tests use a temporary database file. Neither calls Jira, Oasis, or a model provider. A passing fake-service test in a future phase will not by itself verify real provider behavior.
+Server tests use an in-memory SQLite database and run one test file at a time, with a 15-second default timeout to accommodate real password hashing on slower machines. This affects test execution only; password security settings are unchanged. Browser tests use a temporary database file. Neither calls Jira, Oasis, or a model provider. A passing fake-service test will not by itself verify real provider behavior.
 
 ## Current API
 
@@ -93,6 +93,8 @@ Server tests use an in-memory SQLite database; browser tests use a temporary dat
 | `POST /api/auth/login` | Sign in and receive a session cookie and CSRF token. |
 | `GET /api/auth/session` | Get the current user and CSRF token. |
 | `POST /api/auth/logout` | Sign out; include the `X-CSRF-Token` header. |
+| `POST /api/jira/connect` | Start an authenticated, CSRF-protected OAuth request and return its authorization URL. |
+| `GET /api/jira/callback` | Validate and consume the initiating session's OAuth state. Does not establish a connection. |
 
 Session-authenticated state-changing requests require the CSRF token. Sessions expire after 24 hours. Login and registration are rate-limited in memory; those limits reset on restart and are not shared across multiple instances. Duplicate registration reports that an email is already registered, which improves feedback but reveals whether an account exists. Login errors remain generic.
 
@@ -113,6 +115,8 @@ Run `npm run mock:atlassian` from the project root. It listens only on `127.0.0.
 The fake implements `/authorize`, `/oauth/token`, and `/oauth/token/accessible-resources`, following the request shapes in [Atlassian's OAuth guide](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/). It automatically grants consent, reuses a fixed code, and returns a single fake site. It does not implement refresh, real OAuth security, projects, or tickets; the app does not yet call it. Run it on the host: the existing Compose mock profile is not supported because the fake listens on loopback inside the container. `.env.mock` describes planned container addresses and is not loaded by this command.
 
 The server includes the community `jira.js` SDK for the future Jira integration. A fake-only test exercises its initial OAuth helpers with test-only request routing; the application does not yet use the SDK for a real connection.
+
+The start endpoint requires `ATLASSIAN_CLIENT_ID` and `OAUTH_REDIRECT_URI` in the server environment; without them it returns 503. It requests `read:jira-work` and creates a single-use state valid for ten minutes, bound to the current account and session. The callback validates the state and reports that Jira is not connected. It deliberately does not exchange or retain the authorization code. Do not use the incomplete flow with a real account; token exchange and encrypted storage are later work. Request logs omit query strings to avoid recording callback codes and state.
 
 ## Project structure and next steps
 

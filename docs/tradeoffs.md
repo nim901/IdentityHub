@@ -51,6 +51,8 @@ Regardless of client, verify fake-server behavior, safe errors, token rotation p
 
 OAuth avoids asking users for personal Jira API tokens, but adds app registration, callback handling, state validation, encrypted token storage, and rotating refresh-token complexity. A simpler token-based integration would reduce setup but is less suitable for a multi-user connection flow. The recent list uses our own user-scoped ticket records because labels do not establish user ownership; the trade-off is that external Jira changes are not synchronized.
 
+The initial callback consumes and validates state but deliberately discards the authorization code: a usable connection requires the subsequent encrypted token-storage and exchange slice. Only one outstanding request per session is kept, so a later start invalidates the earlier one. A new flow removes that user's expired states, and session deletion cascades to pending states.
+
 ## AI digest and uncertain outcomes
 
 A model can produce a more useful summary than an extractive fallback, but adds provider access, cost, latency, and untrusted-input risks. The provider is still undecided. Restrict the model to summarization, validate output, and clearly label fallback results as degraded.
@@ -68,6 +70,8 @@ A database transaction cannot include the remote Jira request. Persisting pendin
 **Decision:** Run end-to-end tests against a separate local server and a temporary SQLite database, then remove the temporary directory after the run. This exercises the real UI, API, migrations, and database without modifying a developer's accounts.
 
 **Trade-off:** Browser installation and a full application build make these tests slower than Fastify injection tests. A forced termination or machine crash can leave a temporary folder behind; ordinary test failures are cleaned up. No external services are contacted.
+
+Server test files run with one Vitest worker and a 15-second default timeout. This reduces contention between real Argon2 operations and gives slower machines room to finish, at the cost of a longer suite. Production password-hashing parameters remain unchanged.
 
 ## Radix account menu
 

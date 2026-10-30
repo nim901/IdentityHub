@@ -57,7 +57,7 @@ Add the responsive workspace shell, local finding drafts, settings, and session 
 
 ### 3. Jira connection
 
-Groundwork: the standalone local fake models authorization, code exchange, and accessible resources. Tests exercise `jira.js` OAuth helpers against it with test-only routing. The app does not connect to it yet; refresh and project discovery remain future work.
+Groundwork: the standalone local fake models authorization, code exchange, and accessible resources. The app can start OAuth and validate a session-bound, single-use state in the callback; it does not exchange the code or establish a connection. Tests use the fake without provider calls. Encrypted token storage, exchange, refresh and project discovery remain future work.
 
 Recheck current Atlassian documentation; implement a fake service, OAuth connection, encrypted token storage, refresh rotation with a per-user lock, and project discovery.
 

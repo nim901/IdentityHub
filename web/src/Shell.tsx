@@ -2,14 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { FindingComposer, type FindingDraft } from "./FindingComposer";
+import { Settings } from "./Settings";
 import type { Session } from "./authApi";
 
 type Props = { session: Session; onSignOut: () => void };
-type Destination = "findings" | "signout";
+type Destination = "findings" | "settings" | "signout";
 const emptyDraft: FindingDraft = { project: "", title: "", description: "" };
 
 export function Shell({ session, onSignOut }: Props) {
-  const [view, setView] = useState<"findings" | "report">("findings");
+  const [view, setView] = useState<"findings" | "report" | "settings">(
+    "findings",
+  );
   const [draft, setDraft] = useState<FindingDraft>(emptyDraft);
   const [pending, setPending] = useState<Destination | null>(null);
   const [focusFindings, setFocusFindings] = useState(false);
@@ -49,9 +52,11 @@ export function Shell({ session, onSignOut }: Props) {
     setDraft(emptyDraft);
     if (destination === "signout") {
       onSignOut();
-    } else {
+    } else if (destination === "findings") {
       setFocusFindings(true);
       setView("findings");
+    } else {
+      setView("settings");
     }
   }
 
@@ -71,10 +76,18 @@ export function Shell({ session, onSignOut }: Props) {
           <span className="brand-mark">i</span>IdentityHub
         </div>
         <nav aria-label="Main navigation">
-          <span className="active">Findings</span>
-          <span>
-            Settings <small>coming soon</small>
-          </span>
+          <button
+            className={view !== "settings" ? "active" : ""}
+            onClick={() => leave("findings")}
+          >
+            Findings
+          </button>
+          <button
+            className={view === "settings" ? "active" : ""}
+            onClick={() => leave("settings")}
+          >
+            Settings
+          </button>
         </nav>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger
@@ -109,6 +122,8 @@ export function Shell({ session, onSignOut }: Props) {
           onChange={setDraft}
           onBack={() => leave("findings")}
         />
+      ) : view === "settings" ? (
+        <Settings email={session.user.email} />
       ) : (
         <main id="content" className="wrap workspace">
           <div className="findings-heading">

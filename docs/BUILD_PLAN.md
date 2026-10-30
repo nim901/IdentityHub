@@ -98,3 +98,7 @@ The current UI slice adds a responsive shell and Radix account menu around the e
 ## Findings draft slice in review
 
 The reporting view holds an unsent draft in memory, warns before leaving, and does not call Jira. The ticket ledger remains unavailable rather than showing a fabricated empty result. Full session refresh and identity-change handling remains a later slice.
+
+## Settings and session slice in review
+
+Settings uses accessible tabs for unavailable Jira and API-key features. Session checks use the existing endpoint on focus and visibility changes; no authentication contract was added.

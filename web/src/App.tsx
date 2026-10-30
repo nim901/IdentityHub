@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AuthForm } from "./AuthForm";
 import { Shell } from "./Shell";
 import { errorMessage, getSession, signOut, type Session } from "./authApi";
@@ -8,50 +8,101 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [notice, setNotice] = useState("");
   const [retry, setRetry] = useState(0);
+  const [signingOut, setSigningOut] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
+  const requestVersion = useRef(0);
+  const refreshPending = useRef(false);
 
   useEffect(() => {
     let active = true;
+    const version = ++requestVersion.current;
     setLoading(true);
     setMessage("");
-
     getSession()
       .then((result) => {
-        if (active) setSession(result);
+        if (active && version === requestVersion.current) setSession(result);
       })
       .catch((error) => {
-        if (active) setMessage(errorMessage(error));
+        if (active && version === requestVersion.current)
+          setMessage(errorMessage(error));
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active && version === requestVersion.current) setLoading(false);
       });
-
     return () => {
       active = false;
     };
   }, [retry]);
 
-  async function handleSignOut() {
-    if (!session) return;
+  useEffect(() => {
+    if (!session || signingOut || logoutError) return;
+    const currentUserId = session.user.id;
+    async function refreshSession() {
+      if (document.visibilityState !== "visible" || refreshPending.current)
+        return;
+      refreshPending.current = true;
+      const version = ++requestVersion.current;
+      try {
+        const current = await getSession();
+        if (version !== requestVersion.current) return;
+        if (!current) {
+          setSession(null);
+          setNotice(
+            "Your session ended. Any unsent draft was cleared. Please sign in again.",
+          );
+        } else {
+          setSession(current);
+          setMessage(
+            current.user.id === currentUserId
+              ? ""
+              : "Your account changed. Any unsent draft was cleared.",
+          );
+        }
+      } catch (error) {
+        if (version === requestVersion.current) setMessage(errorMessage(error));
+      } finally {
+        refreshPending.current = false;
+      }
+    }
+    window.addEventListener("focus", refreshSession);
+    document.addEventListener("visibilitychange", refreshSession);
+    return () => {
+      window.removeEventListener("focus", refreshSession);
+      document.removeEventListener("visibilitychange", refreshSession);
+    };
+  }, [session?.user.id, signingOut, logoutError]);
 
+  async function handleSignOut() {
+    if (!session || signingOut) return;
+    ++requestVersion.current;
+    setSigningOut(true);
+    setMessage("");
     try {
       await signOut(session.csrfToken);
       setSession(null);
-      setMessage("");
-    } catch (error) {
-      setMessage(errorMessage(error));
+      setLogoutError(false);
+    } catch {
+      setLogoutError(true);
+    } finally {
+      setSigningOut(false);
     }
   }
 
-  if (loading) {
+  function handleSignIn(current: Session) {
+    ++requestVersion.current;
+    setNotice("");
+    setSession(current);
+  }
+
+  if (loading)
     return (
       <main className="auth-page">
         <p>Checking your session...</p>
       </main>
     );
-  }
-
-  if (!session && message) {
+  if (!session && message)
     return (
       <main className="auth-page">
         <div>
@@ -60,31 +111,45 @@ export default function App() {
         </div>
       </main>
     );
-  }
-
   if (session) {
     return (
       <>
-        <Shell session={session} onSignOut={handleSignOut} />
+        <Shell
+          key={session.user.id}
+          session={session}
+          onSignOut={handleSignOut}
+        />
         {message && (
           <p className="wrap" role="alert">
             {message}
           </p>
         )}
+        {logoutError && (
+          <div className="wrap" role="alert">
+            <p>
+              Sign out could not be confirmed. Your session may still be active.
+            </p>
+            <button disabled={signingOut} onClick={handleSignOut}>
+              Retry sign out
+            </button>
+            <button disabled={signingOut} onClick={() => setLogoutError(false)}>
+              Back to workspace
+            </button>
+          </div>
+        )}
       </>
     );
   }
-
   return (
     <main className="auth-page">
       <div className="auth-card">
         <div className="brand">
-          <span className="brand-mark">i</span>
-          IdentityHub
+          <span className="brand-mark">i</span>IdentityHub
         </div>
         <h1>Welcome</h1>
         <p className="subtitle">Sign in or create an account to continue.</p>
-        <AuthForm onSignIn={setSession} />
+        {notice && <p role="alert">{notice}</p>}
+        <AuthForm onSignIn={handleSignIn} />
       </div>
     </main>
   );

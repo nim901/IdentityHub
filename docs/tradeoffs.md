@@ -2,6 +2,17 @@
 
 These decisions favor a small take-home project that is easy to run and explain. They are choices for this scope, not universal rankings. Revisit them when requirements or evidence change.
 
+## One repository rather than separate frontend and backend repositories
+
+**Decision:** Keep `web/` and `server/` as separate workspaces in one repository. One clone, one dependency installation, and one Compose setup make the proof of concept easier to share, run, and review. The applications remain separate layers with an HTTP boundary.
+
+**Trade-off:** Separate repositories could give frontend and backend teams independent ownership, access controls, release cycles, and deployment pipelines. They also add coordination around API changes, version compatibility, setup, and cross-repository changes. If the teams or release schedules become independent, splitting the repositories is a reasonable future choice.
+
+## NestJS and full-stack Next.js
+
+**NestJS:** [NestJS](https://docs.nestjs.com/exception-filters/faq/http-adapter) is a server-side framework, so it would be an alternative for the backend alongside a separate frontend, not a framework for both sides. Its modules, dependency injection, and conventions can help larger teams and applications; it can even use Fastify underneath. For this small proof of concept, direct Fastify plus explicit routes, services, and repositories gives us the needed separation with fewer framework concepts and dependencies to explain. If the backend grows substantially or the team already uses NestJS, its conventions could justify the additional structure.
+
+**Next.js:** If the intended comparison is a single framework for frontend and backend, [Next.js](https://nextjs.org/docs) is a React full-stack framework with [route handlers](https://nextjs.org/docs/app/getting-started/route-handlers). It could simplify a unified web application, especially when server rendering or its routing features are useful. We chose React/Vite plus a separate Fastify API to keep the browser-to-API boundary explicit and straightforward to review for this assignment; the project does not currently need server rendering. The trade-off is maintaining two workspace build configurations and an API boundary that a unified framework could reduce. Neither choice is inherently more secure; security depends on the implementation.
 ## SQLite rather than MongoDB
 
 **Decision:** Use SQLite with plain SQL migrations. The data is structured and related: users own sessions, Jira connections, keys, and ticket records. SQL constraints and transactions help enforce uniqueness and coordinate duplicate-prevention records. A file-backed database needs no separate database service, so a reviewer can start the application with less setup.
@@ -39,3 +50,15 @@ OAuth avoids asking users for personal Jira API tokens, but adds app registratio
 A model can produce a more useful summary than an extractive fallback, but adds provider access, cost, latency, and untrusted-input risks. The provider is still undecided. Restrict the model to summarization, validate output, and clearly label fallback results as degraded.
 
 A database transaction cannot include the remote Jira request. Persisting pending, done, and unknown states reduces duplicate creates, but an uncertain outcome requires human investigation and can interrupt retries. This favors avoiding duplicate tickets over automatic recovery; reconciliation and durable queues are future work.
+
+## Registration feedback and account discovery
+
+**Decision:** Tell a user when an email address is already registered so they can sign in instead. Login failures remain generic, and registration and login are rate-limited.
+
+**Trade-off:** The registration response reveals whether an email is registered, making account enumeration possible. Rate limiting reduces but does not eliminate that risk. A production system should consider a generic response with verified email-based account recovery and stronger distributed abuse controls.
+
+## Browser test isolation
+
+**Decision:** Run end-to-end tests against a separate local server and a temporary SQLite database, then remove the temporary directory after the run. This exercises the real UI, API, migrations, and database without modifying a developer's accounts.
+
+**Trade-off:** Browser installation and a full application build make these tests slower than Fastify injection tests. A forced termination or machine crash can leave a temporary folder behind; ordinary test failures are cleaned up. No external services are contacted.

@@ -1,0 +1,106 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import {
+  spawn,
+  type ChildProcess,
+  type ChildProcessWithoutNullStreams,
+} from "node:child_process";
+import { createServer } from "node:net";
+
+async function availablePort(): Promise<number> {
+  const probe = createServer();
+  await new Promise<void>((resolve, reject) => {
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", resolve);
+  });
+  const address = probe.address();
+  if (!address || typeof address === "string")
+    throw new Error("Unable to select a port");
+  await new Promise<void>((resolve, reject) => {
+    probe.close((error) => (error ? reject(error) : resolve()));
+  });
+  return address.port;
+}
+
+function waitForServer(server: ChildProcessWithoutNullStreams): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("E2E server did not start")),
+      15000,
+    );
+    server.stdout.on("data", (chunk) => {
+      if (chunk.toString().includes("Server listening at")) {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+    server.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    server.once("exit", () => {
+      clearTimeout(timer);
+      reject(new Error("E2E server exited before startup"));
+    });
+    server.stderr.resume();
+  });
+}
+
+function waitForExit(child: ChildProcess): Promise<number> {
+  return new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("exit", (result) => resolve(result ?? 1));
+  });
+}
+
+async function run() {
+  const port = await availablePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const directory = await mkdtemp(join(tmpdir(), "identityhub-e2e-"));
+  const server = spawn(process.execPath, ["dist/index.js"], {
+    cwd: resolve("server"),
+    env: {
+      ...process.env,
+      DATABASE_PATH: join(directory, "e2e.db"),
+      PORT: String(port),
+      APP_BASE_URL: baseUrl,
+    },
+    stdio: "pipe",
+  });
+  let runner: ChildProcess | undefined;
+  let interrupted = false;
+
+  function interrupt() {
+    interrupted = true;
+    runner?.kill();
+    server.kill();
+  }
+
+  process.once("SIGINT", interrupt);
+  process.once("SIGTERM", interrupt);
+  try {
+    await waitForServer(server);
+    if (interrupted) throw new Error("E2E run interrupted");
+    runner = spawn(
+      process.execPath,
+      [resolve("node_modules/@playwright/test/cli.js"), "test"],
+      {
+        stdio: "inherit",
+        env: { ...process.env, E2E_BASE_URL: baseUrl },
+      },
+    );
+    const result = await waitForExit(runner);
+    process.exitCode = interrupted ? 1 : result;
+  } finally {
+    server.kill();
+    if (server.exitCode === null && server.signalCode === null) {
+      await new Promise((resolve) => server.once("exit", resolve));
+    }
+    await rm(directory, { recursive: true, force: true });
+    process.removeListener("SIGINT", interrupt);
+    process.removeListener("SIGTERM", interrupt);
+  }
+}
+
+await run();

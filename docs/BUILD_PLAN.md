@@ -8,12 +8,12 @@ Use TypeScript in strict mode, React and Vite for the web interface, Fastify for
 
 ## Planned interfaces
 
-The browser calls only our API. Session-authenticated writes require a CSRF token. These routes are planned; only `/healthz` exists in phase 0.
+The browser calls only our API. Session-authenticated writes require a CSRF token. The health and authentication routes are implemented in the current phase 1 changes; Jira, findings, API keys, and digest interfaces remain planned.
 
 | Interface | Purpose |
 | --- | --- |
 | `GET /healthz` | Report application health. |
-| Authentication routes | Register, log in, log out, and obtain the current session and CSRF token. Exact route names are implementation choices. |
+| `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/session` | Manage accounts and sessions; the session response includes a CSRF token. |
 | `POST /api/jira/connect` | Start a session-bound Jira OAuth connection and return the authorization URL. |
 | `GET /api/jira/callback` | Validate OAuth state, exchange the code, and store the connection. |
 | `GET /api/jira/projects` | List projects available to the connected user. |
@@ -45,9 +45,9 @@ Set up the workspaces, strict type checking, health endpoint, tests, environment
 
 ### 1. Accounts and isolation
 
-Add migrations, registration, login, logout, sessions, CSRF, security headers, login rate limiting, and a two-user test harness.
+Implement SQLite migrations, registration, login, logout, sessions, CSRF, security headers, login and registration rate limits, and two-user isolation tests. Add a basic account interface with helpful submit-time validation and browser end-to-end tests using a temporary database.
 
-**Done when:** tests cover cookie flags, session renewal and expiry, logout, CSRF rejection, generic login errors, rate limiting, and user/session isolation. Add resource isolation tests as each resource is implemented.
+**Current status:** Implemented locally and awaiting review. Host tests and browser tests pass; Docker starts and serves the account flow. Tests cover cookie flags, session renewal and expiry, logout, CSRF rejection, generic login errors, rate limiting, user/session isolation, registration feedback, and the browser account flow. Add resource isolation tests as each later resource is implemented.
 
 ### 2. Jira connection
 

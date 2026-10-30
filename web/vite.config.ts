@@ -1,9 +1,10 @@
 import { defineConfig } from "vite";
+const apiTarget = process.env.IDENTITYHUB_API_TARGET ?? "http://127.0.0.1:3000";
 export default defineConfig({
   server: {
     proxy: {
-      "/api": "http://localhost:3000",
-      "/healthz": "http://localhost:3000",
+      "/api": apiTarget,
+      "/healthz": apiTarget,
     },
   },
 });

@@ -47,7 +47,7 @@ Set up the workspaces, strict type checking, health endpoint, tests, environment
 
 Implement SQLite migrations, registration, login, logout, sessions, CSRF, security headers, login and registration rate limits, and two-user isolation tests. Add a basic account interface with helpful submit-time validation and browser end-to-end tests using a temporary database.
 
-**Current status:** Implemented locally and awaiting review. Host tests and browser tests pass; Docker starts and serves the account flow. Tests cover cookie flags, session renewal and expiry, logout, CSRF rejection, generic login errors, rate limiting, user/session isolation, registration feedback, and the browser account flow. Add resource isolation tests as each later resource is implemented.
+**Current status:** Merged in PR #2. Host and browser tests passed; the final Docker rebuild remains unverified. Tests cover cookie flags, session renewal and expiry, logout, CSRF rejection, generic login errors, rate limiting, user/session isolation, registration feedback, and the browser account flow. Add resource isolation tests as each later resource is implemented.
 
 ### 2. Jira connection
 
@@ -90,3 +90,7 @@ Review security and isolation, fix findings, write setup and architecture docume
 Work one phase at a time. After each phase run tests, review the security requirements touched, report passing and unverified checks, and have the owner review the diff before its commit. Automated tests use fakes; the owner controls credentials, account setup, and live service writes. Record design decisions and dependency purposes as the project evolves.
 
 Scheduling, teams and roles, SSO, Jira webhooks, automatic reconciliation, a durable job queue, audit logs, and multi-region deployment are out of scope. The provider, model, and cost for the AI path remain to be chosen.
+
+## UI foundation in review
+
+The current UI slice adds a responsive shell and Radix account menu around the existing authentication flow. Findings, reporting, and settings functionality remain future slices. Verify the latest Docker image and browser screenshots before recording them as passed.

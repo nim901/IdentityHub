@@ -102,3 +102,7 @@ The reporting view holds an unsent draft in memory, warns before leaving, and do
 ## Settings and session slice in review
 
 Settings uses accessible tabs for unavailable Jira and API-key features. Session checks use the existing endpoint on focus and visibility changes; no authentication contract was added.
+
+## Backend review in progress
+
+The project-local Fastify reference and a review of existing authentication and session handling are available in `docs/BACKEND_REVIEW.md`. Review findings are recorded for follow-up; provider integration has not started.

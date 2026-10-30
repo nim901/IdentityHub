@@ -119,3 +119,5 @@ The signed-in interface includes a responsive account shell and an accessible ac
 The Findings view shows an unavailable ledger until Jira is implemented. The reporting view holds a temporary draft in memory only; it cannot create a ticket. Leaving with a nonempty draft prompts for confirmation. Browsers control the reload or tab-close warning and may suppress it, especially on mobile. Drafts are lost on reload or process termination. Views do not create browser history entries or support deep links.
 
 Settings contains planned Jira connection and API access panels; those services remain unavailable. Session checks on focus or visibility changes retain drafts on temporary failures and clear them on confirmed expiry or account changes. If sign-out fails, the application does not claim the server session ended.
+
+The project-local Fastify reference and the current authentication review are described in [the backend review](docs/BACKEND_REVIEW.md). Its third-party examples are guidance, subject to this project's security and design decisions.

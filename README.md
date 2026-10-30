@@ -115,3 +115,5 @@ Next phases add Jira OAuth and a fake Atlassian server, findings and the recent 
 ## UI foundation
 
 The signed-in interface includes a responsive account shell and an accessible account menu. Jira connection and ticket features remain unavailable. The Radix Dropdown Menu dependency provides the account menu's keyboard and focus behavior; the interface uses custom CSS. Further workspace views are planned.
+
+The Findings view shows an unavailable ledger until Jira is implemented. The reporting view holds a temporary draft in memory only; it cannot create a ticket. Leaving with a nonempty draft prompts for confirmation. Browsers control the reload or tab-close warning and may suppress it, especially on mobile. Drafts are lost on reload or process termination. Views do not create browser history entries or support deep links.

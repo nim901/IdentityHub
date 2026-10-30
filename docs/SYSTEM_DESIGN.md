@@ -156,3 +156,5 @@ The current application stores only hashes of session IDs. The planned API-key i
 ## UI foundation
 
 The signed-in shell uses a Radix dropdown for account actions and calls only the existing authentication API. The shell labels Jira functionality as unavailable; it does not contact Jira or introduce new server routes.
+
+The current reporting view keeps draft text in component memory and does not send or persist it. The browser may suppress unload warnings. No findings API or Jira connection is implemented yet.

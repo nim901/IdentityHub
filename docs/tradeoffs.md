@@ -66,3 +66,7 @@ A database transaction cannot include the remote Jira request. Persisting pendin
 ## Radix account menu
 
 Use the focused Radix Dropdown Menu primitive for keyboard and focus handling, with project CSS for appearance. This adds a web dependency but avoids implementing menu accessibility from scratch. No full component framework or router is introduced.
+
+## Temporary finding draft
+
+The draft is kept in memory so it is not retained in browser storage. It is lost on reload or process termination; the browser may suppress unload warnings. Radix Alert Dialog supplies accessible confirmation and focus handling before in-app navigation.

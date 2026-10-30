@@ -74,7 +74,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The command builds the app, starts a separate local server using a temporary SQLite database, runs the browser tests, and removes that database afterward. It does not use the Docker volume or your local app database. A forced process termination or machine crash may leave a temporary `identityhub-e2e-` folder in the system temporary directory.
+The command builds the app and runs browser tests in two groups, each with a separate local server and temporary SQLite database. This also gives the verification group a fresh rate-limit state. The databases are removed afterward; the tests do not use the Docker volume or your local app database. A forced process termination or machine crash may leave a temporary `identityhub-e2e-` folder in the system temporary directory.
 
 To run tests inside Docker, including rebuilding the test image after changes:
 
@@ -116,7 +116,7 @@ Next phases add Jira OAuth and a fake Atlassian server, findings and the recent 
 
 ## UI foundation
 
-The signed-in interface includes a responsive account shell and an accessible account menu. Jira connection and ticket features remain unavailable. The Radix Dropdown Menu dependency provides the account menu's keyboard and focus behavior; the interface uses custom CSS. Further workspace views are planned.
+The signed-in interface includes a responsive account shell and an accessible account menu. Jira connection and ticket features remain unavailable. The Radix Dropdown Menu dependency provides the account menu's keyboard and focus behavior; the interface uses custom CSS. The [build plan](docs/BUILD_PLAN.md) groups the UI and backend review as phase 2 and plans Jira connection for phase 3.
 
 The Findings view shows an unavailable ledger until Jira is implemented. The reporting view holds a temporary draft in memory only; it cannot create a ticket. Leaving with a nonempty draft prompts for confirmation. Browsers control the reload or tab-close warning and may suppress it, especially on mobile. Drafts are lost on reload or process termination. Views do not create browser history entries or support deep links.
 

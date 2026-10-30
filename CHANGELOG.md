@@ -2,12 +2,24 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Session security fixes (in review)
+## Phase 2 — Framework alignment and foundation verification (in review)
+
+- Built and ran the app with an isolated Docker Compose project using the example environment and a temporary volume. The app and health endpoint returned 200, Compose reported healthy, and the container test profile passed eight server tests.
+- Reviewed the authentication, findings, report, draft confirmation, and settings screens at a 375-pixel mobile viewport; no horizontal overflow was detected.
+- All 14 browser tests passed, including two local users switching accounts across tabs while an unsent draft was open; the first user's draft and project key were cleared when the session refreshed.
+- Browser tests run in two independently isolated server/database groups to avoid exhausting the shared registration rate limit. No real provider services or credentials are used.
+- Grouped the merged UI and backend-review work as phase 2 and moved subsequent planned phases forward by one; Jira connection is now phase 3.
+
+## Session security fixes
+
+Merged in [PR #7](https://github.com/nim901/IdentityHub/pull/7).
 
 - Authentication responses now use `Cache-Control: no-store`. Session checks time out after ten seconds, and newer checks supersede stalled requests.
 - Eight server tests and twelve browser tests passed; the browser run built the application. Docker and a real two-user account-switch test remain unverified.
 
-## Fastify reference and backend review (in review)
+## Fastify reference and backend review
+
+Merged in [PR #6](https://github.com/nim901/IdentityHub/pull/6).
 
 - Added a project-local third-party Fastify reference and reviewed the current authentication and session implementation. No backend features or contracts were changed.
 - The Fastify-assisted security review found that session responses containing account information and the CSRF token lack an explicit `Cache-Control: no-store` header, allowing clients or intermediaries to retain them depending on their caching behavior. The issue is documented for a separate fix; it has not been fixed in this phase.

@@ -8,7 +8,7 @@ Use TypeScript in strict mode, React and Vite for the web interface, Fastify for
 
 ## Planned interfaces
 
-The browser calls only our API. Session-authenticated writes require a CSRF token. The health and authentication routes are implemented in the current phase 1 changes; Jira, findings, API keys, and digest interfaces remain planned.
+The browser calls only our API. Session-authenticated writes require a CSRF token. Health and authentication routes are implemented; Jira, findings, API keys, and digest interfaces remain planned.
 
 | Interface | Purpose |
 | --- | --- |
@@ -47,39 +47,45 @@ Set up the workspaces, strict type checking, health endpoint, tests, environment
 
 Implement SQLite migrations, registration, login, logout, sessions, CSRF, security headers, login and registration rate limits, and two-user isolation tests. Add a basic account interface with helpful submit-time validation and browser end-to-end tests using a temporary database.
 
-**Current status:** Merged in PR #2. Host and browser tests passed; the final Docker rebuild remains unverified. Tests cover cookie flags, session renewal and expiry, logout, CSRF rejection, generic login errors, rate limiting, user/session isolation, registration feedback, and the browser account flow. Add resource isolation tests as each later resource is implemented.
+**Current status:** Merged in PR #2. Tests cover cookie flags, session renewal and expiry, logout, CSRF rejection, generic login errors, rate limiting, user/session isolation, registration feedback, and the browser account flow. Add resource isolation tests as each later resource is implemented.
 
-### 2. Jira connection
+### 2. Framework alignment and foundation
+
+Add the responsive workspace shell, local finding drafts, settings, and session resilience; review the existing backend using the Fastify reference and address identified security issues. These UI states do not provide Jira or API-key functionality.
+
+**Current status:** UI and backend-review slices merged in PRs #3–#7. The current app image and container test profile passed in a disposable Compose project with the example environment and a separate volume. Mobile layouts were visually reviewed at 375 pixels. A browser test switches two local users across tabs with an open draft and verifies it is cleared. Provider integration and live-provider checks remain unverified.
+
+### 3. Jira connection
 
 Recheck current Atlassian documentation; implement a fake service, OAuth connection, encrypted token storage, refresh rotation with a per-user lock, and project discovery.
 
 **Done when:** fake-service tests cover the happy path, replay, mismatched and expired state, rotation, concurrent refresh, revoked access, and secrets absent from logs.
 
-### 3. Findings and recent tickets
+### 4. Findings and recent tickets
 
 Implement the shared finding service, project authorization, Jira issue creation, form, and recent list. Choose a supported non-subtask issue type using the configured default where available.
 
 **Done when:** tests cover validation, project permissions, safe Jira errors, text-only document content, stored-site links, per-site serialization, and user/project-scoped recent results ordered newest first and limited to ten. Links open safely in a new tab.
 
-### 4. External API
+### 5. External API
 
 Add API-key creation, listing and revocation, project restrictions, the scanner endpoint, rate limits, idempotency, and a short OpenAPI document.
 
 **Done when:** tests cover all documented response codes, hashed-only key storage, revoked keys, cross-user access, concurrent requests, body conflicts, and unknown outcomes.
 
-### 5. AI blog digest
+### 6. AI blog digest
 
 Discover posts from the sitemap with a metadata cache, one request at a time, at least 500 ms between requests, bounded responses and timeouts, and an HTTPS host allowlist. Select the latest `datePublished` across the covered sitemap; explain the selection rule. Summarize untrusted article text with a configurable model adapter that has no tools, validate its output, and use the shared finding service. Do not store article text.
 
 **Done when:** fake-only tests cover out-of-order listings, re-stamped dates, crawl and parse failures, model errors, output validation, injection attempts, and duplicate states. `--dry-run` creates no ticket; `--require-ai` fails if the model is unavailable. Without that flag, extractive fallback is explicitly marked degraded and exits with code 3. Choose a provider before implementing its adapter and check its current documentation.
 
-### 6. Live verification
+### 7. Live verification
 
 The owner configures a Jira test site and model provider and manually checks OAuth, form creation, description rendering, API creation, and the digest with real AI. Record actual results and failures; fake tests do not prove provider behavior.
 
 **Done when:** live checks are recorded, with any outstanding checks clearly identified.
 
-### 7. Review and submission
+### 8. Review and submission
 
 Review security and isolation, fix findings, write setup and architecture documentation, inspect the submission archive, and record a short demo.
 
@@ -91,18 +97,18 @@ Work one phase at a time. After each phase run tests, review the security requir
 
 Scheduling, teams and roles, SSO, Jira webhooks, automatic reconciliation, a durable job queue, audit logs, and multi-region deployment are out of scope. The provider, model, and cost for the AI path remain to be chosen.
 
-## UI foundation in review
+## UI foundation (merged, PR #3)
 
-The current UI slice adds a responsive shell and Radix account menu around the existing authentication flow. Findings, reporting, and settings functionality remain future slices. Verify the latest Docker image and browser screenshots before recording them as passed.
+The UI foundation adds a responsive shell and Radix account menu around the existing authentication flow.
 
-## Findings draft slice in review
+## Findings draft (merged, PR #4)
 
-The reporting view holds an unsent draft in memory, warns before leaving, and does not call Jira. The ticket ledger remains unavailable rather than showing a fabricated empty result. Full session refresh and identity-change handling remains a later slice.
+The reporting view holds an unsent draft in memory, warns before leaving, and does not call Jira. The ticket ledger remains unavailable rather than showing a fabricated empty result.
 
-## Settings and session slice in review
+## Settings and session handling (merged, PR #5)
 
 Settings uses accessible tabs for unavailable Jira and API-key features. Session checks use the existing endpoint on focus and visibility changes; no authentication contract was added.
 
-## Backend review in progress
+## Backend review and security fixes (merged, PRs #6 and #7)
 
-The project-local Fastify reference and a review of existing authentication and session handling are available in `docs/BACKEND_REVIEW.md`. Review findings are recorded for follow-up; provider integration has not started.
+The project-local Fastify reference and a review of existing authentication and session handling are available in `docs/BACKEND_REVIEW.md`. The identified cache policy and stalled session-check issues were fixed; provider integration has not started.

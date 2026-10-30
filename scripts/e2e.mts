@@ -54,7 +54,7 @@ function waitForExit(child: ChildProcess): Promise<number> {
   });
 }
 
-async function run() {
+async function run(testArguments: string[]) {
   const port = await availablePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const directory = await mkdtemp(join(tmpdir(), "identityhub-e2e-"));
@@ -84,7 +84,7 @@ async function run() {
     if (interrupted) throw new Error("E2E run interrupted");
     runner = spawn(
       process.execPath,
-      [resolve("node_modules/@playwright/test/cli.js"), "test"],
+      [resolve("node_modules/@playwright/test/cli.js"), "test", ...testArguments],
       {
         stdio: "inherit",
         env: { ...process.env, E2E_BASE_URL: baseUrl },
@@ -103,4 +103,5 @@ async function run() {
   }
 }
 
-await run();
+await run(["--grep-invert", "@verification"]);
+if (!process.exitCode) await run(["--grep", "@verification"]);

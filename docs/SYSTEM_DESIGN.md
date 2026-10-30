@@ -1,6 +1,6 @@
 # IdentityHub system design
 
-This diagram describes the planned end state. The current phase 1 changes implement the web account flow, authentication routes and service, and SQLite users and sessions; the Jira, findings, API key, and digest components remain planned.
+This diagram describes the planned end state. The current implementation includes the web account flow, authentication routes and service, SQLite users and sessions, and a workspace shell with local drafts; the Jira, finding creation, API key, and digest components remain planned.
 
 ```mermaid
 flowchart LR

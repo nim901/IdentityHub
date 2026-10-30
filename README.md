@@ -96,6 +96,8 @@ Server tests use an in-memory SQLite database; browser tests use a temporary dat
 
 Session-authenticated state-changing requests require the CSRF token. Sessions expire after 24 hours. Login and registration are rate-limited in memory; those limits reset on restart and are not shared across multiple instances. Duplicate registration reports that an email is already registered, which improves feedback but reveals whether an account exists. Login errors remain generic.
 
+Authentication responses include `Cache-Control: no-store`. Session checks have a ten-second timeout; a newer focus or visibility check supersedes an older request. A temporary check failure keeps an unsent draft, while confirmed expiry or an account change clears it.
+
 ## Configuration and security
 
 `.env` and database files are ignored by Git and excluded from Docker's build context. `.env.example` contains placeholders; `.env.mock` contains public fake values only. Never put real credentials in committed files or logs. For a deployed system, use a secrets manager or your hosting platform's secret configuration.

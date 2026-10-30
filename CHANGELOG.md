@@ -2,6 +2,11 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
+## Session security fixes (in review)
+
+- Authentication responses now use `Cache-Control: no-store`. Session checks time out after ten seconds, and newer checks supersede stalled requests.
+- Eight server tests and twelve browser tests passed; the browser run built the application. Docker and a real two-user account-switch test remain unverified.
+
 ## Fastify reference and backend review (in review)
 
 - Added a project-local third-party Fastify reference and reviewed the current authentication and session implementation. No backend features or contracts were changed.

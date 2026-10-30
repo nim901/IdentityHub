@@ -22,6 +22,16 @@ const cookie = (header: string | string[] | undefined) =>
   String(header).split(";")[0];
 
 describe("authentication", () => {
+  it("prevents caching of authentication responses", async () => {
+    const app = await setup();
+    await app.inject({ method: "POST", url: "/api/auth/register", payload: credentials });
+    const login = await app.inject({ method: "POST", url: "/api/auth/login", payload: credentials });
+    const session = await app.inject({ url: "/api/auth/session", headers: { cookie: cookie(login.headers["set-cookie"]) } });
+    const missing = await app.inject({ url: "/api/auth/session" });
+    expect(login.headers["cache-control"]).toBe("no-store");
+    expect(session.headers["cache-control"]).toBe("no-store");
+    expect(missing.headers["cache-control"]).toBe("no-store");
+  });
   it("registers, logs in with a new protected session, and logs out with CSRF", async () => {
     const app = await setup(true);
     expect(
@@ -134,6 +144,7 @@ describe("authentication", () => {
       });
     }
     expect(result.statusCode).toBe(429);
+    expect(result.headers["cache-control"]).toBe("no-store");
   });
   it("returns only the user associated with each session", async () => {
     const app = await setup();

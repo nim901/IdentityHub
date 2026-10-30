@@ -23,6 +23,11 @@ export async function buildApp(
   });
   await app.register(cookie);
   await app.register(helmet);
+  app.addHook("onRequest", async (request, reply) => {
+    if (request.routeOptions.url?.startsWith("/api/auth/")) {
+      reply.header("Cache-Control", "no-store");
+    }
+  });
   await app.register(rateLimit, { global: false });
   const auth = new AuthService(db);
   app.addHook("preHandler", csrfGuard(auth));

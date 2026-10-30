@@ -1,6 +1,6 @@
 # IdentityHub system design
 
-This diagram describes the planned end state. The current implementation includes the web account flow, authentication, session-bound Jira OAuth and encrypted credentials, and a workspace shell with local drafts; project discovery, finding creation, API keys, and the digest remain planned.
+This diagram describes the planned end state. The current implementation includes the web account flow, authentication, session-bound Jira OAuth and encrypted credentials, site and project discovery, and a workspace shell with local drafts; finding creation, Jira UI integration, API keys, and the digest remain planned.
 
 ```mermaid
 flowchart LR
@@ -56,13 +56,13 @@ If the remote outcome is uncertain, the operation remains blocked for human revi
 
 The standalone fake Atlassian service listens on loopback only and accepts a configured loopback callback. It uses public fixed test values, keeps no user data, and is not wired into the app. The existing Docker mock profile cannot expose its container-loopback listener and is not supported. Its limited protocol shapes follow [Atlassian's 3LO documentation](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/); it does not enforce real OAuth replay protection.
 
-The Jira boundary uses `jira.js` for authorization URLs and code exchange. The authenticated, CSRF-protected start route stores only a hash of a random state, bound to the user and session for ten minutes. The callback atomically consumes matching, unexpired state, exchanges the code, and stores encrypted tokens only if the initiating session remains valid. Session deletion removes its state. AES-256-GCM uses a random nonce and authenticates the user and token type; the 32-byte key is configured outside the database. Request logs omit query strings, and Jira responses use no-store and no-referrer. The token request is restricted to Atlassian's documented endpoint, rejects redirects, times out, and bounds response size. Tests use fake transports without network access. Refresh and project discovery remain future work.
+The Jira boundary uses `jira.js` for authorization URLs and code exchange. The authenticated, CSRF-protected start route stores only a hash of a random state, bound to the user and session for ten minutes. The callback atomically consumes matching, unexpired state, exchanges the code, and stores encrypted tokens only if the initiating session remains valid. Session deletion removes its state. AES-256-GCM uses a random nonce and authenticates the user and token type; the 32-byte key is configured outside the database. Request logs omit query strings, and Jira responses use no-store and no-referrer. The token request is restricted to Atlassian's documented endpoint, rejects redirects, times out, and bounds response size. Tests use fake transports without network access. Refreshes are single-flight per user in one process, and a database marker requires reconnection after interrupted or uncertain rotation. Site selection and project discovery are scoped to the authenticated user.
 
 The current account flow stores hashed session IDs and uses session-bound CSRF tokens. Jira tokens are encrypted at rest; API keys will be stored as hashes in a later phase. The planned digest will treat blog and model output as untrusted, fetch only allowed hosts, supply article text as data to a tool-free model, validate the response, and avoid storing article text. Real provider behavior requires separate owner verification; automated tests use fakes.
 
 ## Planned SQLite schema
 
-This is the target schema; users, sessions, OAuth states, and encrypted Jira credentials are implemented in migrations. The planned `jira_connections` table describes later site discovery. Migration files are authoritative for the current database. Timestamps are UTC ISO-8601 strings; IDs are opaque text values. Foreign keys must be enabled on every connection. Repositories must scope user-owned queries to the authenticated user even where a foreign key exists.
+This is the target schema; users, sessions, OAuth states, and encrypted Jira credentials are implemented in migrations. The implementation separates selected sites and encrypted credentials; the illustrative `jira_connections` table below describes the intended data together. Migration files are authoritative for the current database. Timestamps are UTC ISO-8601 strings; IDs are opaque text values. Foreign keys must be enabled on every connection. Repositories must scope user-owned queries to the authenticated user even where a foreign key exists.
 
 ```sql
 CREATE TABLE users (
@@ -161,6 +161,6 @@ The current application stores hashes of session IDs and encrypted Jira tokens i
 
 The signed-in shell uses a Radix dropdown for account actions and calls only the existing authentication API. The shell labels Jira functionality as unavailable; it does not contact Jira or introduce new server routes.
 
-The current reporting view keeps draft text in component memory and does not send or persist it. The browser may suppress unload warnings. No findings API or Jira connection is implemented yet.
+The current reporting view keeps draft text in component memory and does not send or persist it. The browser may suppress unload warnings. The reporting view is not yet connected to the Jira connection or a findings API.
 
 Session rechecks use the existing API. The signed-in workspace is keyed by user identity so a confirmed account change discards the previous user's in-memory draft. A transient check failure leaves it in place.

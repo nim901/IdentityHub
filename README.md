@@ -1,6 +1,6 @@
 # IdentityHub
 
-IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth token exchange with encrypted storage. A usable Jira connection, ticket creation, API keys, and the AI digest are **not implemented or live-verified** yet.
+IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth, encrypted rotating credentials, site selection, and project discovery. Jira UI integration, ticket creation, API keys, and the AI digest are not implemented. Jira has not been live-verified.
 
 ## Requirements
 
@@ -95,6 +95,8 @@ Server tests use an in-memory SQLite database and run one test file at a time, w
 | `POST /api/auth/logout` | Sign out; include the `X-CSRF-Token` header. |
 | `POST /api/jira/connect` | Start an authenticated, CSRF-protected OAuth request and return its authorization URL. |
 | `GET /api/jira/callback` | Validate state, exchange the code, and store encrypted credentials for the initiating user. |
+| `GET /api/jira/sites`, `POST /api/jira/site` | List accessible sites and select one using JSON `id`. |
+| `GET /api/jira/projects` | List projects for the selected site. |
 
 Session-authenticated state-changing requests require the CSRF token. Sessions expire after 24 hours. Login and registration are rate-limited in memory; those limits reset on restart and are not shared across multiple instances. Duplicate registration reports that an email is already registered, which improves feedback but reveals whether an account exists. Login errors remain generic.
 
@@ -120,7 +122,7 @@ The start endpoint requires `ATLASSIAN_CLIENT_ID`, `ATLASSIAN_CLIENT_SECRET`, `O
 
 The SDK uses Atlassian's fixed authorization and token hosts. `ATLASSIAN_AUTH_BASE` and `ATLASSIAN_AUTH_BROWSER_BASE`, if set, must both be `https://auth.atlassian.com`; other values disable the flow with 503 rather than silently contacting Atlassian. In particular, `.env.mock` is not a runnable integration configuration. Tests route to the fake with an injected transport, not these environment variables.
 
-The start endpoint requests `read:jira-work` and `offline_access` and creates single-use state valid for ten minutes. A successful callback exchanges the code and stores tokens encrypted using AES-256-GCM, bound to the authenticated user. It does not return tokens. A failed exchange consumes the state and requires a new attempt. Only one token exchange per user can run at a time in this single-instance app. Refresh, project discovery, and UI integration are not implemented; do not perform live OAuth until those pieces are ready. Request logs omit query strings to avoid recording callback codes and state. Atlassian documents [the exchange and offline scope](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/).
+The start endpoint requests `read:jira-work` and `offline_access` and creates single-use state valid for ten minutes. A successful callback exchanges the code and stores tokens encrypted using AES-256-GCM, bound to the authenticated user. It does not return tokens. A failed exchange consumes the state and requires a new attempt. Only one token exchange per user can run at a time in this single-instance app. Refresh rotation and project discovery are implemented; UI integration and owner-run live verification remain outstanding. Request logs omit query strings to avoid recording callback codes and state. Atlassian documents [the exchange and offline scope](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/).
 
 ## Project structure and next steps
 
@@ -128,14 +130,18 @@ The start endpoint requests `read:jira-work` and `offline_access` and creates si
 - `server/src/routes/` handles HTTP and CSRF checks; `server/src/services/` contains authentication logic; `server/src/db/` contains the SQLite connection and authentication repository; `server/migrations/` defines the database schema.
 - [Build plan](docs/BUILD_PLAN.md), [system design](docs/SYSTEM_DESIGN.md), and [trade-offs](docs/tradeoffs.md) describe the planned work and decisions. [Changelog](CHANGELOG.md) records completed phases.
 
-Next phases add Jira OAuth and a fake Atlassian server, findings and the recent list, API keys and the external API, and the AI digest. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
+Next phases add the finding API and recent history, Jira UI integration, API keys and the external API, and the AI digest. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
 
 ## UI foundation
 
 The signed-in interface includes a responsive account shell and an accessible account menu. Jira connection and ticket features remain unavailable. The Radix Dropdown Menu dependency provides the account menu's keyboard and focus behavior; the interface uses custom CSS. The [build plan](docs/BUILD_PLAN.md) groups the UI and backend review as phase 2 and plans Jira connection for phase 3.
 
-The Findings view shows an unavailable ledger until Jira is implemented. The reporting view holds a temporary draft in memory only; it cannot create a ticket. Leaving with a nonempty draft prompts for confirmation. Browsers control the reload or tab-close warning and may suppress it, especially on mobile. Drafts are lost on reload or process termination. Views do not create browser history entries or support deep links.
+The Findings view shows an unavailable ledger until the UI is connected to the backend. The reporting view holds a temporary draft in memory only; it cannot create a ticket. Leaving with a nonempty draft prompts for confirmation. Browsers control the reload or tab-close warning and may suppress it, especially on mobile. Drafts are lost on reload or process termination. Views do not create browser history entries or support deep links.
 
 Settings contains planned Jira connection and API access panels; those services remain unavailable. Session checks on focus or visibility changes retain drafts on temporary failures and clear them on confirmed expiry or account changes. If sign-out fails, the application does not claim the server session ended.
 
 The project-local Fastify reference and the current authentication review are described in [the backend review](docs/BACKEND_REVIEW.md). Its third-party examples are guidance, subject to this project's security and design decisions.
+
+## Jira connection limitations
+
+This is a single-instance application. Refreshes are coordinated per user within the process; before a refresh, the database marks the old token in use. A failed or interrupted rotation requires reconnecting rather than reusing a possibly invalidated token. The selected site must be an accessible `*.atlassian.net` HTTPS site. Provider requests are bounded, timed out, and reject redirects. An otherwise unexpired access token rejected by Jira requires reconnecting. Tests use fake transports and cannot establish real Jira compatibility.

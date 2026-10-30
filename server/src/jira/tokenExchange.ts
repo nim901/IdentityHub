@@ -1,4 +1,4 @@
-import { exchangeAuthorizationCode } from 'jira.js/core';
+import { exchangeAuthorizationCode, refreshOAuth2Token } from 'jira.js/core';
 import { z } from 'zod';
 
 const tokenSchema = z.object({
@@ -9,9 +9,12 @@ const tokenSchema = z.object({
 });
 
 // Token exchange and offline_access: https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/
-export async function exchangeCode(config: { clientId: string; clientSecret: string; redirectUri: string; fetch?: typeof fetch }, code: string) {
-  const guardedFetch: typeof fetch = async (input, init) => {
-    if (String(input) !== 'https://auth.atlassian.com/oauth/token' || init?.method !== 'POST') throw new Error('Unexpected token endpoint');
+type TokenConfig = { clientId: string; clientSecret: string; redirectUri: string; fetch?: typeof fetch };
+
+export function createGuardedFetch(config: { fetch?: typeof fetch }, allowed: (url: URL, method: string) => boolean, limit = 32768): typeof fetch {
+  return async (input, init) => {
+    const url = new URL(String(input));
+    if (!allowed(url, init?.method ?? 'GET')) throw new Error('Unexpected provider endpoint');
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     const timedOut = new Promise<never>((_, reject) => {
@@ -29,7 +32,7 @@ export async function exchangeCode(config: { clientId: string; clientSecret: str
             const part = await reader.read();
             if (part.done) break;
             size += part.value.byteLength;
-            if (size > 32768) throw new Error('Response too large');
+            if (size > limit) throw new Error('Response too large');
             chunks.push(part.value);
           }
         } finally { void reader.cancel().catch(() => {}); }
@@ -39,6 +42,18 @@ export async function exchangeCode(config: { clientId: string; clientSecret: str
     try { return await Promise.race([request(), timedOut]); }
     finally { clearTimeout(timer!); }
   };
-  const result = await exchangeAuthorizationCode({ clientId: config.clientId, clientSecret: config.clientSecret, redirectUri: config.redirectUri, code, fetch: guardedFetch });
+}
+
+const tokenEndpoint = (url: URL, method: string) => url.href === 'https://auth.atlassian.com/oauth/token' && method === 'POST';
+
+export async function exchangeCode(config: TokenConfig, code: string) {
+  const result = await exchangeAuthorizationCode({ clientId: config.clientId, clientSecret: config.clientSecret, redirectUri: config.redirectUri, code, fetch: createGuardedFetch(config, tokenEndpoint) });
+  return tokenSchema.parse(result);
+}
+
+// Atlassian rotates and invalidates the previous refresh token:
+// https://developer.atlassian.com/cloud/oauth/getting-started/refresh-tokens/
+export async function refreshTokens(config: TokenConfig, refreshToken: string) {
+  const result = await refreshOAuth2Token({ clientId: config.clientId, clientSecret: config.clientSecret, refreshToken, fetch: createGuardedFetch(config, tokenEndpoint) });
   return tokenSchema.parse(result);
 }

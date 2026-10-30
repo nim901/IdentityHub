@@ -2,7 +2,16 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Settings and session handling (in review)
+## Fastify reference and backend review (in review)
+
+- Added a project-local third-party Fastify reference and reviewed the current authentication and session implementation. No backend features or contracts were changed.
+- The Fastify-assisted security review found that session responses containing account information and the CSRF token lack an explicit `Cache-Control: no-store` header, allowing clients or intermediaries to retain them depending on their caching behavior. The issue is documented for a separate fix; it has not been fixed in this phase.
+- Seven server tests and ten browser tests passed, and the browser run built the application. Docker and live-provider checks remain unverified.
+- Review findings and suggested follow-up tests are in `docs/BACKEND_REVIEW.md`.
+
+## Settings and session handling
+
+Merged in [PR #5](https://github.com/nim901/IdentityHub/pull/5).
 
 - Added keyboard-accessible Settings tabs with clear unavailable states for Jira connection and API keys.
 - Recheck sessions on focus or visibility changes. Confirmed expiry and account changes clear unsent drafts; a transient check failure keeps the draft. Failed sign-out reports that the session may still be active and offers retry.

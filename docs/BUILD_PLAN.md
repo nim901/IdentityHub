@@ -8,7 +8,7 @@ Use TypeScript in strict mode, React and Vite for the web interface, Fastify for
 
 ## Planned interfaces
 
-The browser calls only our API. Session-authenticated writes require a CSRF token. Health and authentication routes are implemented; Jira, findings, API keys, and digest interfaces remain planned.
+The browser calls only our API. Session-authenticated writes require a CSRF token. Health, authentication, and the initial Jira OAuth start and callback are implemented; project discovery, findings, API keys, and digest interfaces remain planned.
 
 | Interface | Purpose |
 | --- | --- |
@@ -57,7 +57,7 @@ Add the responsive workspace shell, local finding drafts, settings, and session 
 
 ### 3. Jira connection
 
-Groundwork: the standalone local fake models authorization, code exchange, and accessible resources. The app can start OAuth and validate a session-bound, single-use state in the callback; it does not exchange the code or establish a connection. Tests use the fake without provider calls. Encrypted token storage, exchange, refresh and project discovery remain future work.
+Groundwork: the standalone local fake models authorization, code exchange, and accessible resources. The app starts OAuth, validates session-bound state, exchanges the code, and stores user-scoped encrypted tokens. Tests use fakes without provider calls. Refresh and project discovery remain future work; credentials alone are not yet a usable Jira connection.
 
 Recheck current Atlassian documentation; implement a fake service, OAuth connection, encrypted token storage, refresh rotation with a per-user lock, and project discovery.
 

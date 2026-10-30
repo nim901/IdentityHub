@@ -25,6 +25,11 @@ export async function jiraRoutes(app: FastifyInstance, auth: AuthService, oauth?
       return reply.code(400).send({ error: 'Invalid or expired connection request' });
     }
     if (input.data.error) return reply.code(400).send({ error: 'Jira authorization was not completed' });
-    return { message: 'Authorization response validated; Jira is not connected yet.' };
+    try {
+      if (!await oauth.exchangeAndStore(session, input.data.code!)) return reply.code(401).send({ error: 'Not signed in' });
+    } catch {
+      return reply.code(502).send({ error: 'Jira authorization could not be completed. Start again.' });
+    }
+    return { message: 'Jira credentials saved. Project discovery is not available yet.' };
   });
 }

@@ -22,7 +22,7 @@ export function createFakeAtlassian(callback: string) {
     if (!body || body.grant_type !== 'authorization_code' || body.client_id !== 'mock-client-id' || body.client_secret !== 'mock-client-secret' || body.code !== 'fake-code' || body.redirect_uri !== callback) {
       return reply.code(400).send({ error: 'invalid_grant' });
     }
-    return { access_token: 'fake-access-token', token_type: 'Bearer', expires_in: 3600, scope: 'read:jira-work' };
+    return { access_token: 'fake-access-token', refresh_token: 'fake-refresh-token', token_type: 'Bearer', expires_in: 3600, scope: 'read:jira-work offline_access' };
   });
   app.get('/oauth/token/accessible-resources', async (request, reply) => {
     if (request.headers.authorization !== 'Bearer fake-access-token') return reply.code(401).send({ error: 'invalid_token' });

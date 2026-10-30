@@ -2,7 +2,12 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 3 — OAuth state handling (in review)
+## Phase 3 — Token exchange and encrypted storage (in review)
+
+- Exchange single-use OAuth codes using `jira.js`, request offline access, and store per-user access and refresh tokens encrypted with AES-256-GCM. Exchange errors are sanitized; no real provider checks have been performed. Refresh and project discovery remain unimplemented.
+- All 24 host and Docker tests passed; host lint and build, dependency audit, Docker runtime build, and fresh-database migration and health checks passed. Tests cover invalid configuration, user isolation, authenticated encryption, replay, logout during exchange, upstream errors, redirects, oversized responses, and a stalled exchange. Browser and real-provider checks remain unverified.
+
+## Phase 3 — OAuth state handling (merged in PR #10)
 
 - Added an authenticated, CSRF-protected OAuth start and callback with user- and session-bound, expiring, single-use state. Request logs omit query strings. Callback validation does not exchange codes or connect Jira; token storage and exchange remain future work.
 - Limited server test files to one worker and raised the default test timeout to 15 seconds to reduce resource-related authentication test failures without changing password hashing.

@@ -1,6 +1,6 @@
 # IdentityHub
 
-IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides account registration, sign-in and sign-out, server-side sessions, a health endpoint, and initial Jira OAuth state handling. A usable Jira connection, ticket creation, API keys, and the AI digest are **not implemented or verified** yet.
+IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth token exchange with encrypted storage. A usable Jira connection, ticket creation, API keys, and the AI digest are **not implemented or live-verified** yet.
 
 ## Requirements
 
@@ -18,7 +18,7 @@ From the project root, create a local environment file if you do not already hav
 cp .env.example .env
 ```
 
-On PowerShell, use `Copy-Item .env.example .env` instead. Do not overwrite an existing `.env`: it may contain your settings. The example values are sufficient for the current local account flow; Jira and AI settings are placeholders for later phases. Do not use the example secrets for a real deployment.
+On PowerShell, use `Copy-Item .env.example .env` instead. Do not overwrite an existing `.env`: it may contain your settings. The example values are sufficient for the current local account flow; Jira requires separate configuration and AI settings are placeholders. Do not use example secrets for a real deployment.
 
 Start the application:
 
@@ -94,7 +94,7 @@ Server tests use an in-memory SQLite database and run one test file at a time, w
 | `GET /api/auth/session` | Get the current user and CSRF token. |
 | `POST /api/auth/logout` | Sign out; include the `X-CSRF-Token` header. |
 | `POST /api/jira/connect` | Start an authenticated, CSRF-protected OAuth request and return its authorization URL. |
-| `GET /api/jira/callback` | Validate and consume the initiating session's OAuth state. Does not establish a connection. |
+| `GET /api/jira/callback` | Validate state, exchange the code, and store encrypted credentials for the initiating user. |
 
 Session-authenticated state-changing requests require the CSRF token. Sessions expire after 24 hours. Login and registration are rate-limited in memory; those limits reset on restart and are not shared across multiple instances. Duplicate registration reports that an email is already registered, which improves feedback but reveals whether an account exists. Login errors remain generic.
 
@@ -106,17 +106,21 @@ Authentication responses include `Cache-Control: no-store`. Session checks have 
 
 Passwords are stored as Argon2id hashes. Session cookies are HttpOnly and SameSite=Lax, and are marked Secure when `APP_BASE_URL` uses HTTPS. The cookie contains a random session identifier; only its hash is stored in SQLite. Security headers and request size limits are enabled. This is a single-instance proof of concept, not a production-ready deployment.
 
-The environment example includes `SESSION_SECRET`, `ENCRYPTION_KEY`, Atlassian, and AI settings reserved for later phases; the current account implementation does not use them. The root `digest` command remains a placeholder.
+The account implementation does not use `SESSION_SECRET`; AI settings remain placeholders. The root `digest` command remains a placeholder.
 
 ## Local fake Atlassian service
 
-Run `npm run mock:atlassian` from the project root. It listens only on `127.0.0.1:4010` and uses the callback `http://localhost:3000/api/jira/callback` by default. Set `OAUTH_REDIRECT_URI` in the shell to another local HTTP callback if needed. It accepts only that exact callback. The fake client ID is `mock-client-id`, secret is `mock-client-secret`, code is `fake-code`, and bearer token is `fake-access-token`; all are public test values.
+Run `npm run mock:atlassian` from the project root. It listens only on `127.0.0.1:4010` and uses the callback `http://localhost:3000/api/jira/callback` by default. Set `OAUTH_REDIRECT_URI` in the shell to another local HTTP callback if needed. It accepts only that exact callback. The fake client ID is `mock-client-id`, secret is `mock-client-secret`, code is `fake-code`, and tokens are `fake-access-token` and `fake-refresh-token`; all are public test values.
 
 The fake implements `/authorize`, `/oauth/token`, and `/oauth/token/accessible-resources`, following the request shapes in [Atlassian's OAuth guide](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/). It automatically grants consent, reuses a fixed code, and returns a single fake site. It does not implement refresh, real OAuth security, projects, or tickets; the app does not yet call it. Run it on the host: the existing Compose mock profile is not supported because the fake listens on loopback inside the container. `.env.mock` describes planned container addresses and is not loaded by this command.
 
-The server includes the community `jira.js` SDK for the future Jira integration. A fake-only test exercises its initial OAuth helpers with test-only request routing; the application does not yet use the SDK for a real connection.
+The server uses the community `jira.js` SDK for OAuth. Tests inject a fake transport and never contact a provider. The standalone fake is not automatically wired into the application.
 
-The start endpoint requires `ATLASSIAN_CLIENT_ID` and `OAUTH_REDIRECT_URI` in the server environment; without them it returns 503. It requests `read:jira-work` and creates a single-use state valid for ten minutes, bound to the current account and session. The callback validates the state and reports that Jira is not connected. It deliberately does not exchange or retain the authorization code. Do not use the incomplete flow with a real account; token exchange and encrypted storage are later work. Request logs omit query strings to avoid recording callback codes and state.
+The start endpoint requires `ATLASSIAN_CLIENT_ID`, `ATLASSIAN_CLIENT_SECRET`, `OAUTH_REDIRECT_URI`, and `ENCRYPTION_KEY` in the server environment; missing or invalid configuration returns 503. Generate a unique 32-byte key as base64 with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"` and keep it in ignored local configuration or a secret store. Back it up securely: changing or losing the key makes existing credentials unreadable. The callback URL must be HTTPS or loopback HTTP, without credentials, query, or fragment. Local development does not load `.env` automatically; Docker Compose does.
+
+The SDK uses Atlassian's fixed authorization and token hosts. `ATLASSIAN_AUTH_BASE` and `ATLASSIAN_AUTH_BROWSER_BASE`, if set, must both be `https://auth.atlassian.com`; other values disable the flow with 503 rather than silently contacting Atlassian. In particular, `.env.mock` is not a runnable integration configuration. Tests route to the fake with an injected transport, not these environment variables.
+
+The start endpoint requests `read:jira-work` and `offline_access` and creates single-use state valid for ten minutes. A successful callback exchanges the code and stores tokens encrypted using AES-256-GCM, bound to the authenticated user. It does not return tokens. A failed exchange consumes the state and requires a new attempt. Only one token exchange per user can run at a time in this single-instance app. Refresh, project discovery, and UI integration are not implemented; do not perform live OAuth until those pieces are ready. Request logs omit query strings to avoid recording callback codes and state. Atlassian documents [the exchange and offline scope](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/).
 
 ## Project structure and next steps
 

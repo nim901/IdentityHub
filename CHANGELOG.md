@@ -2,7 +2,17 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 2 — Framework alignment and foundation verification (in review)
+## Phase 3 — Fake Atlassian groundwork (in review)
+
+- Added a standalone loopback-only fake for authorization, code exchange, and accessible resources, with fixed public test values. Real OAuth, refresh, token storage, projects, and UI integration remain unimplemented.
+- Twelve server tests passed, including four focused fake-service tests; lint, build, audit, and a local listener smoke test passed. An earlier concurrent test run timed out twice; the subsequent standalone run passed. Docker was initially missing from the shell PATH; the installed engine was subsequently found. Live provider behavior remains unverified.
+- Selected `jira.js` 6.3.0 for the future Jira client; test-only routing exercises its OAuth helpers against the fake without provider calls.
+- Evaluated temporary `jira.js` 6.3.0 installation and its OAuth helpers with intercepted fake responses; documented its URL, refresh, retry, timeout, redirect, and error-handling trade-offs.
+- Rebuilt the Docker test image and passed all 12 container tests using the installed Docker executable. The standalone fake is not verified as a container service.
+- After adding the SDK, all 14 host and container tests passed, as did lint, build, dependency audit, runtime image build, and an isolated runtime health check. An initial container test run had two timeouts while the runtime check ran concurrently; a subsequent standalone run passed. Real provider behavior remains unverified.
+- Review rerun: lint and audit passed; three host tests timed out with checks running concurrently, then all 14 passed when rerun separately. The Compose mock profile remains unsupported because its listener is bound to container loopback.
+
+## Phase 2 — Framework alignment and foundation verification (merged in PR #8)
 
 - Built and ran the app with an isolated Docker Compose project using the example environment and a temporary volume. The app and health endpoint returned 200, Compose reported healthy, and the container test profile passed eight server tests.
 - Reviewed the authentication, findings, report, draft confirmation, and settings screens at a 375-pixel mobile viewport; no horizontal overflow was detected.

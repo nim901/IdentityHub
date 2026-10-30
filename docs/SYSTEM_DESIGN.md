@@ -54,6 +54,10 @@ If the remote outcome is uncertain, the operation remains blocked for human revi
 
 ## Trust boundaries
 
+The standalone fake Atlassian service listens on loopback only and accepts a configured loopback callback. It uses public fixed test values, keeps no user data, and is not wired into the app. The existing Docker mock profile cannot expose its container-loopback listener and is not supported. Its limited protocol shapes follow [Atlassian's 3LO documentation](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/); it does not enforce real OAuth replay protection.
+
+The future Jira boundary will use `jira.js`. Its test adapter dispatches OAuth requests to the fake without network access; URL rewriting is test-only. Token persistence, session-bound state, per-user refresh coordination and safe request controls remain application responsibilities.
+
 The current account flow stores hashed session IDs and uses session-bound CSRF tokens. In later phases, OAuth state will be bound to the initiating session and expire; Jira tokens will be encrypted at rest and API keys stored as hashes. The planned digest will treat blog and model output as untrusted, fetch only allowed hosts, supply article text as data to a tool-free model, validate the response, and avoid storing article text. Real provider behavior requires separate owner verification; automated tests will use fakes.
 
 ## Planned SQLite schema

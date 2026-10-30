@@ -104,7 +104,15 @@ Authentication responses include `Cache-Control: no-store`. Session checks have 
 
 Passwords are stored as Argon2id hashes. Session cookies are HttpOnly and SameSite=Lax, and are marked Secure when `APP_BASE_URL` uses HTTPS. The cookie contains a random session identifier; only its hash is stored in SQLite. Security headers and request size limits are enabled. This is a single-instance proof of concept, not a production-ready deployment.
 
-The environment example includes `SESSION_SECRET`, `ENCRYPTION_KEY`, Atlassian, and AI settings reserved for later phases; the current account implementation does not use them. The root `digest` and `mock:atlassian` commands are placeholders and cannot run until those features are implemented.
+The environment example includes `SESSION_SECRET`, `ENCRYPTION_KEY`, Atlassian, and AI settings reserved for later phases; the current account implementation does not use them. The root `digest` command remains a placeholder.
+
+## Local fake Atlassian service
+
+Run `npm run mock:atlassian` from the project root. It listens only on `127.0.0.1:4010` and uses the callback `http://localhost:3000/api/jira/callback` by default. Set `OAUTH_REDIRECT_URI` in the shell to another local HTTP callback if needed. It accepts only that exact callback. The fake client ID is `mock-client-id`, secret is `mock-client-secret`, code is `fake-code`, and bearer token is `fake-access-token`; all are public test values.
+
+The fake implements `/authorize`, `/oauth/token`, and `/oauth/token/accessible-resources`, following the request shapes in [Atlassian's OAuth guide](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/). It automatically grants consent, reuses a fixed code, and returns a single fake site. It does not implement refresh, real OAuth security, projects, or tickets; the app does not yet call it. Run it on the host: the existing Compose mock profile is not supported because the fake listens on loopback inside the container. `.env.mock` describes planned container addresses and is not loaded by this command.
+
+The server includes the community `jira.js` SDK for the future Jira integration. A fake-only test exercises its initial OAuth helpers with test-only request routing; the application does not yet use the SDK for a real connection.
 
 ## Project structure and next steps
 

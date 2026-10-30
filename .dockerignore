@@ -17,3 +17,6 @@ docs/
 AGENTS.md
 BRIF.md
 *.pdf
+
+test-results/
+playwright-report/

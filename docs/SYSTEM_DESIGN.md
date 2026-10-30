@@ -1,6 +1,6 @@
 # IdentityHub system design
 
-This diagram describes the planned end state. Phase 0 currently provides only the application skeleton and health endpoint.
+This diagram describes the planned end state. The current phase 1 changes implement the web account flow, authentication routes and service, and SQLite users and sessions; the Jira, findings, API key, and digest components remain planned.
 
 ```mermaid
 flowchart LR
@@ -54,11 +54,11 @@ If the remote outcome is uncertain, the operation remains blocked for human revi
 
 ## Trust boundaries
 
-OAuth state is bound to the initiating session and expires. Jira tokens are encrypted at rest, and API keys are stored as hashes. The blog and model output are untrusted: the digest fetches only allowed hosts, supplies article text as data to a tool-free model, validates the response, and never stores article text. Real provider behavior is verified separately by the owner; automated tests use fakes.
+The current account flow stores hashed session IDs and uses session-bound CSRF tokens. In later phases, OAuth state will be bound to the initiating session and expire; Jira tokens will be encrypted at rest and API keys stored as hashes. The planned digest will treat blog and model output as untrusted, fetch only allowed hosts, supply article text as data to a tool-free model, validate the response, and avoid storing article text. Real provider behavior requires separate owner verification; automated tests will use fakes.
 
 ## Planned SQLite schema
 
-This is a target schema for implementation, not a migration already applied. Timestamps are UTC ISO-8601 strings; IDs are opaque text values. Foreign keys must be enabled on every connection. Repositories must scope user-owned queries to the authenticated user even where a foreign key exists.
+This is the target schema: the users and sessions tables are implemented in the first migration, while the other tables remain planned. The migration file is authoritative for the current database. Timestamps are UTC ISO-8601 strings; IDs are opaque text values. Foreign keys must be enabled on every connection. Repositories must scope user-owned queries to the authenticated user even where a foreign key exists.
 
 ```sql
 CREATE TABLE users (
@@ -151,4 +151,4 @@ CREATE TABLE digest_posts (
 );
 ```
 
-The application stores only hashes of session IDs and API keys, and encrypts Jira tokens before persistence. OAuth state belongs to both a user and session; application checks must enforce that association and expiry. `pending` and `unknown` records prevent automatic repeat creation when the remote outcome is uncertain. For sitemap caching, migrations may add a last-modified or equivalent change marker after the actual sitemap behavior is verified. Retention and cleanup of expired sessions and OAuth states should be implemented without weakening replay protection.
+The current application stores only hashes of session IDs. The planned API-key implementation will store key hashes, and the Jira implementation will encrypt tokens before persistence. OAuth state belongs to both a user and session; application checks must enforce that association and expiry. `pending` and `unknown` records prevent automatic repeat creation when the remote outcome is uncertain. For sitemap caching, migrations may add a last-modified or equivalent change marker after the actual sitemap behavior is verified. Retention and cleanup of expired sessions and OAuth states should be implemented without weakening replay protection.

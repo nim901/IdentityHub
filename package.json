@@ -1,1 +1,24 @@
-{"name":"identityhub","private":true,"workspaces":["server","web"],"scripts":{"build":"npm run build --workspaces","start":"npm run start --workspace server","dev:server":"npm run dev --workspace server","dev:web":"npm run dev --workspace web","test":"npm test --workspaces --if-present","digest":"npm run digest --workspace server --","mock:atlassian":"npm run mock:atlassian --workspace server","lint":"npm run lint --workspaces --if-present"},"devDependencies":{"typescript":"^5.7.3","vitest":"^4.1.12"}}
+{
+  "name": "identityhub",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "start": "npm run start --workspace server",
+    "dev:server": "npm run dev --workspace server",
+    "dev:web": "npm run dev --workspace web",
+    "test": "npm test --workspaces --if-present",
+    "digest": "npm run digest --workspace server --",
+    "mock:atlassian": "npm run mock:atlassian --workspace server",
+    "lint": "npm run lint --workspaces --if-present",
+    "test:e2e": "npm run build && tsx scripts/e2e.mts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.12"
+  }
+}

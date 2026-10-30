@@ -259,3 +259,148 @@ h2 {
     font-size: 36px;
   }
 }
+
+.findings-heading,
+.section-heading,
+.project-toolbar,
+.composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.primary-button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid #242927;
+  border-radius: 4px;
+  background: #242927;
+  color: #fff;
+}
+.project-toolbar {
+  margin: 36px 0;
+  padding: 18px 0;
+  border-block: 1px solid #d9dcd5;
+  color: #606862;
+}
+.section-heading h2 {
+  margin: 0;
+}
+.section-heading span,
+.composer-footer p {
+  color: #606862;
+  font-size: 13px;
+}
+.ledger-empty {
+  margin-top: 24px;
+  padding: 64px 16px;
+  text-align: center;
+  border-block: 1px solid #d9dcd5;
+  color: #606862;
+}
+.ledger-empty h3 {
+  color: #242927;
+  font-size: 16px;
+}
+.text-button {
+  border: 0;
+  background: transparent;
+  color: #23685b;
+  padding: 8px 0;
+  text-decoration: underline;
+}
+.composer {
+  max-width: 736px;
+  padding-top: 48px;
+}
+.composer h1 {
+  font-size: 28px;
+  margin-top: 20px;
+}
+.composer label {
+  display: block;
+  margin: 24px 0;
+  font-weight: 600;
+}
+.composer input,
+.composer textarea {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  min-height: 44px;
+  border: 1px solid #b9beb7;
+  border-radius: 4px;
+  font: inherit;
+  background: #fff;
+}
+.composer textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+.destination {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 32px;
+  padding: 16px 0;
+  border-block: 1px solid #d9dcd5;
+}
+.destination span {
+  color: #606862;
+}
+.draft-notice {
+  background: #f0f1eb;
+  padding: 14px;
+  line-height: 1.5;
+}
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: #0008;
+}
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100% - 48px));
+  padding: 24px;
+  border-radius: 4px;
+  background: #faf9f6;
+  box-shadow: 0 8px 28px #0003;
+}
+.dialog h2 {
+  margin-top: 0;
+}
+.dialog p {
+  color: #606862;
+  line-height: 1.5;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+.dialog-actions button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid #242927;
+  border-radius: 4px;
+  background: #fff;
+}
+.dialog-actions button:last-child {
+  color: #fff;
+  background: #242927;
+}
+@media (max-width: 700px) {
+  .findings-heading,
+  .project-toolbar,
+  .composer-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .composer {
+    padding-top: 32px;
+  }
+}

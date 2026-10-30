@@ -6,15 +6,33 @@ import rateLimit from "@fastify/rate-limit";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Writable } from "node:stream";
 import { openDatabase } from "./db/database.js";
 import { AuthService } from "./services/auth.js";
 import { authRoutes } from "./routes/auth.js";
 import { csrfGuard } from "./routes/csrf.js";
+import { JiraOAuth, type JiraOAuthConfig } from "./jira/oauth.js";
+import { jiraRoutes } from "./routes/jira.js";
 
 export async function buildApp(
-  options: { databasePath?: string; secureCookies?: boolean } = {},
+  options: {
+    databasePath?: string;
+    secureCookies?: boolean;
+    jiraOAuth?: JiraOAuthConfig;
+    loggerStream?: Writable;
+  } = {},
 ) {
-  const app = Fastify({ logger: true, bodyLimit: 1024 * 1024 });
+  const app = Fastify({
+    logger: {
+      stream: options.loggerStream,
+      serializers: {
+        req(req) {
+          return { method: req.method, url: req.url?.split('?')[0], host: req.hostname, remoteAddress: req.ip };
+        },
+      },
+    },
+    bodyLimit: 1024 * 1024,
+  });
   const db = openDatabase(
     options.databasePath ?? process.env.DATABASE_PATH ?? "app.db",
   );
@@ -24,8 +42,9 @@ export async function buildApp(
   await app.register(cookie);
   await app.register(helmet);
   app.addHook("onRequest", async (request, reply) => {
-    if (request.routeOptions.url?.startsWith("/api/auth/")) {
+    if (request.routeOptions.url?.startsWith("/api/auth/") || request.routeOptions.url?.startsWith("/api/jira/")) {
       reply.header("Cache-Control", "no-store");
+      reply.header("Referrer-Policy", "no-referrer");
     }
   });
   await app.register(rateLimit, { global: false });
@@ -39,6 +58,14 @@ export async function buildApp(
         process.env.APP_BASE_URL?.startsWith("https://") ??
         false,
     ),
+  );
+  const oauthConfig = options.jiraOAuth ?? (
+    process.env.ATLASSIAN_CLIENT_ID && process.env.OAUTH_REDIRECT_URI
+      ? { clientId: process.env.ATLASSIAN_CLIENT_ID, redirectUri: process.env.OAUTH_REDIRECT_URI }
+      : undefined
+  );
+  await app.register(async (instance) =>
+    jiraRoutes(instance, auth, oauthConfig ? new JiraOAuth(db, oauthConfig) : undefined),
   );
   app.get("/healthz", async () => ({ status: "ok" }));
   const webRoot = resolve(

@@ -51,7 +51,7 @@ Regardless of client, verify fake-server behavior, safe errors, token rotation p
 
 OAuth avoids asking users for personal Jira API tokens, but adds app registration, callback handling, state validation, encrypted token storage, and rotating refresh-token complexity. A simpler token-based integration would reduce setup but is less suitable for a multi-user connection flow. The recent list uses our own user-scoped ticket records because labels do not establish user ownership; the trade-off is that external Jira changes are not synchronized.
 
-The initial callback consumes and validates state but deliberately discards the authorization code: a usable connection requires the subsequent encrypted token-storage and exchange slice. Only one outstanding request per session is kept, so a later start invalidates the earlier one. A new flow removes that user's expired states, and session deletion cascades to pending states.
+The callback consumes state before code exchange, so an upstream or storage failure requires a new authorization. Only one outstanding request per session is kept, so a later start invalidates the earlier one. A new flow removes that user's expired states, and session deletion cascades to pending states. Tokens are encrypted with AES-256-GCM using a stable externally configured key and user/type-bound authenticated data. Losing or changing that key makes stored tokens unreadable; key rotation and refresh coordination are future work. Overlapping exchanges for one user are rejected within this single-instance app; this is not a cross-process lock.
 
 ## AI digest and uncertain outcomes
 

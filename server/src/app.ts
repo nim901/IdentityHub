@@ -59,13 +59,20 @@ export async function buildApp(
         false,
     ),
   );
+  // Test transports are injected explicitly; never silently ignore a configured fake URL.
+  const supportedAuthBases = (!process.env.ATLASSIAN_AUTH_BASE || process.env.ATLASSIAN_AUTH_BASE === 'https://auth.atlassian.com') &&
+    (!process.env.ATLASSIAN_AUTH_BROWSER_BASE || process.env.ATLASSIAN_AUTH_BROWSER_BASE === 'https://auth.atlassian.com');
   const oauthConfig = options.jiraOAuth ?? (
-    process.env.ATLASSIAN_CLIENT_ID && process.env.OAUTH_REDIRECT_URI
-      ? { clientId: process.env.ATLASSIAN_CLIENT_ID, redirectUri: process.env.OAUTH_REDIRECT_URI }
+    supportedAuthBases && process.env.ATLASSIAN_CLIENT_ID && process.env.ATLASSIAN_CLIENT_SECRET && process.env.OAUTH_REDIRECT_URI && process.env.ENCRYPTION_KEY
+      ? { clientId: process.env.ATLASSIAN_CLIENT_ID, clientSecret: process.env.ATLASSIAN_CLIENT_SECRET, redirectUri: process.env.OAUTH_REDIRECT_URI, encryptionKey: process.env.ENCRYPTION_KEY }
       : undefined
   );
+  let oauth: JiraOAuth | undefined;
+  if (oauthConfig) {
+    try { oauth = new JiraOAuth(db, oauthConfig); } catch { /* Invalid configuration disables the connection. */ }
+  }
   await app.register(async (instance) =>
-    jiraRoutes(instance, auth, oauthConfig ? new JiraOAuth(db, oauthConfig) : undefined),
+    jiraRoutes(instance, auth, oauth),
   );
   app.get("/healthz", async () => ({ status: "ok" }));
   const webRoot = resolve(

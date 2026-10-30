@@ -8,6 +8,16 @@ import { JiraOAuth } from '../src/jira/oauth.js';
 
 const apps: Awaited<ReturnType<typeof buildApp>>[] = [];
 const fake = createFakeAtlassian('http://localhost:3000/api/jira/callback');
+const config = {
+  clientId: 'mock-client-id', clientSecret: 'mock-client-secret',
+  redirectUri: 'http://localhost:3000/api/jira/callback',
+  encryptionKey: Buffer.alloc(32, 7).toString('base64'),
+  fetch: (async (input, init) => {
+    if (String(input) !== 'https://auth.atlassian.com/oauth/token') throw new Error('Unexpected destination');
+    const response = await fake.inject({ method: 'POST', url: '/oauth/token', headers: Object.fromEntries(new Headers(init?.headers)), payload: String(init?.body) });
+    return new Response(response.body, { status: response.statusCode, headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch,
+};
 afterAll(async () => fake.close());
 afterEach(async () => { vi.useRealTimers(); await Promise.all(apps.splice(0).map(app => app.close())); });
 
@@ -20,7 +30,7 @@ describe('Jira OAuth state', () => {
       db.prepare('INSERT INTO sessions (id_hash, user_id, csrf_token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)').run('session-hash', 'user', 'csrf', '2026-01-01', '2099-01-01');
       db.prepare('INSERT INTO sessions (id_hash, user_id, csrf_token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)').run('other-session', 'other', 'csrf', '2026-01-01', '2099-01-01');
       db.prepare('INSERT INTO oauth_states (state_hash, user_id, session_id_hash, expires_at) VALUES (?, ?, ?, ?)').run('other-state', 'other', 'other-session', '2000-01-01');
-      const oauth = new JiraOAuth(db, { clientId: 'mock-client-id', redirectUri: 'http://localhost:3000/api/jira/callback' });
+      const oauth = new JiraOAuth(db, config);
       const state = new URL(oauth.start({ id: 'user', email: 'user@example.test', id_hash: 'session-hash', csrf_token: 'csrf' })).searchParams.get('state');
       const stored = db.prepare('SELECT state_hash FROM oauth_states WHERE user_id = ?').get('user') as { state_hash: string };
       expect(stored.state_hash).not.toBe(state);
@@ -41,7 +51,7 @@ describe('Jira OAuth state', () => {
     expect(logs).not.toContain('private-state');
   });
   it('binds state to the initiating session, expires it, and prevents replay', async () => {
-    const app = await buildApp({ databasePath: ':memory:', jiraOAuth: { clientId: 'mock-client-id', redirectUri: 'http://localhost:3000/api/jira/callback' } });
+    const app = await buildApp({ databasePath: ':memory:', jiraOAuth: config });
     apps.push(app);
     const { a, b } = await createTwoUsers(app);
     const start = () => app.inject({ method: 'POST', url: '/api/jira/connect', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken } });
@@ -63,7 +73,7 @@ describe('Jira OAuth state', () => {
     expect(concurrent.map(response => response.statusCode).sort()).toEqual([200, 400]);
     expect(concurrent.find(response => response.statusCode === 200)?.headers['referrer-policy']).toBe('no-referrer');
     expect(concurrent.find(response => response.statusCode === 200)?.headers['cache-control']).toBe('no-store');
-    expect(concurrent.find(response => response.statusCode === 200)?.json().message).toContain('not connected');
+    expect(concurrent.find(response => response.statusCode === 200)?.json().message).toContain('credentials saved');
     const deniedStart = await start();
     const deniedState = new URL(deniedStart.json().authorizationUrl).searchParams.get('state');
     const deniedPath = `/api/jira/callback?error=access_denied&state=${deniedState}`;

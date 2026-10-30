@@ -2,7 +2,13 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 3 — Jira refresh and project discovery (in review)
+## Phase 4A — Finding creation backend (in review)
+
+- Added session-authenticated finding creation, project permission and issue metadata checks, user-scoped recent history, a bounded per-site queue, and idempotency records. Requests require the Jira write grant and a unique idempotency key.
+- Review fixed an SDK metadata mismatch with Atlassian's documented response and checks current resource write scopes even when the token response omits `scope`. Consumed metadata is validated before use. Uncertain outcomes remain blocked for manual review.
+- All 30 host and Docker tests passed; the final Docker run used no network. Lint, build, and dependency audit passed. The final production image started healthy with six migrations on a fresh, network-isolated database. UI integration, the scanner API, and live Jira checks remain outstanding.
+
+## Phase 3 — Jira refresh and project discovery (in review, PR #12)
 
 - Added user-coordinated rotating refresh tokens, accessible-site selection, and project discovery. Failed or interrupted rotations require reconnection.
 - The connection snapshot passed 29 host and Docker tests, including the site-change race test, plus lint and a Docker build. A network-isolated production container started healthy with five migrations on a fresh database. Tests used fake providers; Jira UI, finding creation, and live provider checks remain outstanding.

@@ -30,7 +30,7 @@ export class JiraOAuth {
       this.db.prepare('INSERT INTO oauth_states (state_hash, user_id, session_id_hash, expires_at) VALUES (?, ?, ?, ?)')
         .run(hash(state), session.id, session.id_hash, new Date(now + 600_000).toISOString());
     })();
-    return generateAuthorizationUrl({ clientId: this.config.clientId, redirectUri: this.config.redirectUri, state, scopes: ['read:jira-work', 'offline_access'] });
+    return generateAuthorizationUrl({ clientId: this.config.clientId, redirectUri: this.config.redirectUri, state, scopes: ['read:jira-work', 'write:jira-work', 'offline_access'] });
   }
 
   consume(session: SessionRecord, state: string) {

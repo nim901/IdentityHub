@@ -7,8 +7,18 @@ export type AuthAction = "login" | "register";
 const connectionError =
   "Unable to reach the server. Check that it is running and try again.";
 
-export async function getSession(): Promise<Session | null> {
-  const response = await fetch("/api/auth/session");
+export async function getSession(signal?: AbortSignal): Promise<Session | null> {
+  const timeout = AbortSignal.timeout(10_000);
+  let response: Response;
+  try {
+    response = await fetch("/api/auth/session", {
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new Error("Unable to load your session. Please try again.");
+  }
   if (response.status === 401) return null;
   if (!response.ok)
     throw new Error("Unable to load your session. Please try again.");

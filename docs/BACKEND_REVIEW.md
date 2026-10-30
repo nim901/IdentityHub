@@ -4,8 +4,8 @@ Review scope: current Fastify authentication, session and CSRF handling, reposit
 
 ## Findings
 
-1. **Session responses have no explicit cache policy.** `server/src/routes/auth.ts` returns the user and CSRF token from `GET /api/auth/session`; neither that route nor `server/src/app.ts` sets `Cache-Control: no-store`. An in-memory Fastify injection returned 200 without a Cache-Control header. Without an explicit policy, caching behavior depends on clients and intermediaries; a stale or retained response may expose account information or the CSRF token. Follow-up: set a suitable no-store policy on sensitive authentication responses and test the actual headers for login and session responses.
-2. **A stalled session refresh prevents later refreshes.** `web/src/App.tsx` uses `refreshPending` to skip focus and visibility events until the current `getSession()` resolves, while `web/src/authApi.ts` has no timeout. If the request never settles, a later account change or expiry may not be detected, leaving the prior user's draft visible. Existing browser tests simulate a completed 503 or changed session, not a stalled request. Follow-up: add bounded cancellation or a queued recheck and test delayed responses, account changes, and stale-result ordering.
+1. **Session responses had no explicit cache policy (fix in review).** Authentication routes now send `Cache-Control: no-store`, including error responses. `server/test/auth.test.ts` checks successful login and session responses, unauthenticated session responses, and rate-limited login responses.
+2. **A stalled session refresh blocked later refreshes (fix in review).** Session requests now time out after ten seconds. A newer visible focus or visibility check cancels and supersedes the previous one, and older responses are ignored. `e2e/settings.spec.ts` covers a stalled request, timeout, a later confirmed expiry, and draft preservation; simulated identity-change and temporary-failure tests continue to pass. A real two-user account switch remains unverified.
 
 ## Existing controls and coverage
 

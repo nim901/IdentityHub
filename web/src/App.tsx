@@ -13,7 +13,7 @@ export default function App() {
   const [signingOut, setSigningOut] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
   const requestVersion = useRef(0);
-  const refreshPending = useRef(false);
+  const refreshController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -40,15 +40,17 @@ export default function App() {
     if (!session || signingOut || logoutError) return;
     const currentUserId = session.user.id;
     async function refreshSession() {
-      if (document.visibilityState !== "visible" || refreshPending.current)
-        return;
-      refreshPending.current = true;
+      if (document.visibilityState !== "visible") return;
+      refreshController.current?.abort();
+      const controller = new AbortController();
+      refreshController.current = controller;
       const version = ++requestVersion.current;
       try {
-        const current = await getSession();
+        const current = await getSession(controller.signal);
         if (version !== requestVersion.current) return;
         if (!current) {
           setSession(null);
+          setMessage("");
           setNotice(
             "Your session ended. Any unsent draft was cleared. Please sign in again.",
           );
@@ -61,14 +63,17 @@ export default function App() {
           );
         }
       } catch (error) {
-        if (version === requestVersion.current) setMessage(errorMessage(error));
+        if (!controller.signal.aborted && version === requestVersion.current)
+          setMessage(errorMessage(error));
       } finally {
-        refreshPending.current = false;
+        if (refreshController.current === controller)
+          refreshController.current = null;
       }
     }
     window.addEventListener("focus", refreshSession);
     document.addEventListener("visibilitychange", refreshSession);
     return () => {
+      refreshController.current?.abort();
       window.removeEventListener("focus", refreshSession);
       document.removeEventListener("visibilitychange", refreshSession);
     };

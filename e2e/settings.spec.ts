@@ -98,3 +98,91 @@ test("temporary session failure preserves a draft and account change clears it",
   await page.getByRole("button", { name: /report finding/i }).click();
   await expect(page.getByLabel("Finding title")).toHaveValue("");
 });
+
+test("a newer focus check supersedes a stalled session request", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Email").fill("stalled@example.test");
+  await page.getByLabel("Password").fill("example-password-123");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("status").waitFor();
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: /report finding/i }).click();
+  await page.getByLabel("Finding title").fill("Private draft");
+  let releaseFirst!: () => void;
+  let firstStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    firstStarted = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  let calls = 0;
+  await page.route("**/api/auth/session", async (route) => {
+    calls++;
+    if (calls === 1) {
+      firstStarted();
+      await release;
+      await route
+        .fulfill({
+          json: {
+            user: { id: "stale", email: "stale@example.test" },
+            csrfToken: "fake",
+          },
+        })
+        .catch(() => {});
+    } else {
+      await route.fulfill({ status: 401 });
+    }
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await started;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByRole("alert")).toContainText(
+    "Any unsent draft was cleared",
+    { timeout: 4000 },
+  );
+  releaseFirst();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+});
+
+test("a timed-out session check allows a later retry", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Email").fill("timeout@example.test");
+  await page.getByLabel("Password").fill("example-password-123");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("status").waitFor();
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: /report finding/i }).click();
+  await page.getByLabel("Finding title").fill("Keep this draft");
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let calls = 0;
+  await page.route("**/api/auth/session", async (route) => {
+    calls++;
+    if (calls === 1) {
+      await pending;
+      await route.fulfill({ status: 503 }).catch(() => {});
+    } else {
+      await route.fulfill({ status: 401 });
+    }
+  });
+  try {
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(page.getByRole("alert")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByLabel("Finding title")).toHaveValue(
+      "Keep this draft",
+    );
+    release();
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect.poll(() => calls).toBe(2);
+    await expect(page.getByRole("alert")).toContainText(
+      "Any unsent draft was cleared",
+    );
+  } finally {
+    release();
+  }
+});

@@ -1,4 +1,7 @@
-export type Session = { user: { email: string }; csrfToken: string };
+export type Session = {
+  user: { id: string; email: string };
+  csrfToken: string;
+};
 export type AuthAction = "login" | "register";
 
 const connectionError =
@@ -41,7 +44,8 @@ export async function signOut(csrfToken: string) {
     method: "POST",
     headers: { "x-csrf-token": csrfToken },
   });
-  if (!response.ok) throw new Error("Unable to sign out. Please try again.");
+  if (response.status !== 401 && !response.ok)
+    throw new Error("Unable to sign out. Please try again.");
 }
 
 export function errorMessage(error: unknown) {

@@ -2,7 +2,15 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Local finding draft (in review)
+## Settings and session handling (in review)
+
+- Added keyboard-accessible Settings tabs with clear unavailable states for Jira connection and API keys.
+- Recheck sessions on focus or visibility changes. Confirmed expiry and account changes clear unsent drafts; a transient check failure keeps the draft. Failed sign-out reports that the session may still be active and offers retry.
+- Seven server tests and ten browser tests passed, and the browser run built the application. Docker and visual/mobile checks remain unverified.
+
+## Local finding draft
+
+Merged in [PR #4](https://github.com/nim901/IdentityHub/pull/4).
 
 - Added an unavailable recent-ticket ledger and a reporting view with a temporary in-memory draft. No Jira requests are made.
 - Added a Radix confirmation before discarding a draft and a browser-controlled warning on document unload.

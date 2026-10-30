@@ -70,3 +70,7 @@ Use the focused Radix Dropdown Menu primitive for keyboard and focus handling, w
 ## Temporary finding draft
 
 The draft is kept in memory so it is not retained in browser storage. It is lost on reload or process termination; the browser may suppress unload warnings. Radix Alert Dialog supplies accessible confirmation and focus handling before in-app navigation.
+
+## Settings tabs
+
+Radix Tabs supplies keyboard navigation for the Jira and scanner settings panels. The panels describe unavailable services and do not simulate connections or keys.

@@ -14,20 +14,78 @@ export default function App() {
     let active = true;
     setLoading(true);
     setMessage("");
-    getSession().then((result) => { if (active) setSession(result); })
-      .catch((error) => { if (active) setMessage(errorMessage(error)); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+
+    getSession()
+      .then((result) => {
+        if (active) setSession(result);
+      })
+      .catch((error) => {
+        if (active) setMessage(errorMessage(error));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [retry]);
 
   async function handleSignOut() {
     if (!session) return;
-    try { await signOut(session.csrfToken); setSession(null); setMessage(""); }
-    catch (error) { setMessage(errorMessage(error)); }
+
+    try {
+      await signOut(session.csrfToken);
+      setSession(null);
+      setMessage("");
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
   }
 
-  if (loading) return <main className="auth-page"><p>Checking your session...</p></main>;
-  if (!session && message) return <main className="auth-page"><div><p role="alert">{message}</p><button onClick={() => setRetry((value) => value + 1)}>Retry</button></div></main>;
-  return session ? <><Shell session={session} onSignOut={handleSignOut} />{message && <p className="wrap" role="alert">{message}</p>}</> :
-    <main className="auth-page"><div className="auth-card"><div className="brand"><span className="brand-mark">i</span>IdentityHub</div><h1>Welcome</h1><p className="subtitle">Sign in or create an account to continue.</p><AuthForm onSignIn={setSession} />{message && <p role="alert">{message}</p>}</div></main>;
+  if (loading) {
+    return (
+      <main className="auth-page">
+        <p>Checking your session...</p>
+      </main>
+    );
+  }
+
+  if (!session && message) {
+    return (
+      <main className="auth-page">
+        <div>
+          <p role="alert">{message}</p>
+          <button onClick={() => setRetry((value) => value + 1)}>Retry</button>
+        </div>
+      </main>
+    );
+  }
+
+  if (session) {
+    return (
+      <>
+        <Shell session={session} onSignOut={handleSignOut} />
+        {message && (
+          <p className="wrap" role="alert">
+            {message}
+          </p>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <main className="auth-page">
+      <div className="auth-card">
+        <div className="brand">
+          <span className="brand-mark">i</span>
+          IdentityHub
+        </div>
+        <h1>Welcome</h1>
+        <p className="subtitle">Sign in or create an account to continue.</p>
+        <AuthForm onSignIn={setSession} />
+      </div>
+    </main>
+  );
 }

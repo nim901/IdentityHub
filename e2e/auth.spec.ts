@@ -21,8 +21,14 @@ test("validation appears on submit, not while typing", async ({ page }) => {
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("alert")).toContainText("12 characters");
-  await expect(page.getByLabel("Password")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByLabel("Password")).toHaveAttribute("aria-describedby", "password-error");
+  await expect(page.getByLabel("Password")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.getByLabel("Password")).toHaveAttribute(
+    "aria-describedby",
+    "password-error",
+  );
   await page.getByLabel("Password").fill("long-enough-password");
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
@@ -45,12 +51,16 @@ test("session errors offer a retry", async ({ page }) => {
     await route.fulfill({ status: 503 });
   });
   await page.goto("/");
-  await expect(page.getByRole("alert")).toContainText("Unable to load your session");
+  await expect(page.getByRole("alert")).toContainText(
+    "Unable to load your session",
+  );
   await page.unroute("**/api/auth/session");
   await page.getByRole("button", { name: "Retry" }).click();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 });
-test("account menu supports keyboard and reports unavailable services", async ({ page }) => {
+test("account menu supports keyboard and reports unavailable services", async ({
+  page,
+}) => {
   await page.goto("/");
   await page.getByLabel("Email").fill("menu@example.test");
   await page.getByLabel("Password").fill("example-password-123");
@@ -62,5 +72,7 @@ test("account menu supports keyboard and reports unavailable services", async ({
   await expect(page.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(account).toBeFocused();
-  await expect(page.getByText(/Jira integration is not available/i)).toBeVisible();
+  await expect(
+    page.getByText(/Jira integration is not available/i),
+  ).toBeVisible();
 });

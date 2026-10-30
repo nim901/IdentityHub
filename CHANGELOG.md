@@ -2,7 +2,7 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 1 — Accounts and isolation (in review)
+## Phase 1 — Accounts and isolation
 
 ### Added
 
@@ -33,3 +33,10 @@ Merged in [PR #1](https://github.com/nim901/IdentityHub/pull/1).
 - Host installation, tests, build, type checks, and dependency audit passed.
 - Docker image build, placeholder page, health endpoint, Compose health check, and Docker test profile passed.
 - Authentication, Jira, API keys, findings, and the AI digest were not implemented or live-tested in this phase.
+
+## UI foundation (in review)
+
+- Added a responsive account shell and accessible Radix account menu while retaining the existing authentication API. Jira connection remains unavailable.
+- Radix Dropdown Menu provides keyboard and focus behavior; custom CSS implements the workspace appearance.
+- Added field-level validation, accessible error associations, and a session-check retry screen.
+- The latest Docker rebuild and browser visual checks must be verified on the current machine before claiming they pass.

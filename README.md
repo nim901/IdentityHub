@@ -48,7 +48,7 @@ npm run dev:server
 npm run dev:web
 ```
 
-Open the address printed by Vite, normally [http://localhost:5173](http://localhost:5173). Vite proxies API requests to port 3000. The local API defaults to a SQLite file named `app.db` in the server workspace; set `DATABASE_PATH` in the server process environment to choose another location. The local development command does **not** automatically load `.env`; export variables in the shell when needed. For example, in PowerShell:
+Open the address printed by Vite, normally [http://localhost:5173](http://localhost:5173). Vite proxies API requests to port 3000 using IPv4. If the API runs on a different port, set `IDENTITYHUB_API_TARGET` in the web terminal to its URL before starting Vite. The local API defaults to a SQLite file named `app.db` in the server workspace; set `DATABASE_PATH` in the server process environment to choose another location. The local development command does **not** automatically load `.env`; export variables in the shell when needed. For example, in PowerShell:
 
 ```powershell
 $env:DATABASE_PATH = 'C:\path\to\app.db'
@@ -111,3 +111,7 @@ The environment example includes `SESSION_SECRET`, `ENCRYPTION_KEY`, Atlassian, 
 - [Build plan](docs/BUILD_PLAN.md), [system design](docs/SYSTEM_DESIGN.md), and [trade-offs](docs/tradeoffs.md) describe the planned work and decisions. [Changelog](CHANGELOG.md) records completed phases.
 
 Next phases add Jira OAuth and a fake Atlassian server, findings and the recent list, API keys and the external API, and the AI digest. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
+
+## UI foundation
+
+The signed-in interface includes a responsive account shell and an accessible account menu. Jira connection and ticket features remain unavailable. The Radix Dropdown Menu dependency provides the account menu's keyboard and focus behavior; the interface uses custom CSS. Further workspace views are planned.

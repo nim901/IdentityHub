@@ -62,3 +62,7 @@ A database transaction cannot include the remote Jira request. Persisting pendin
 **Decision:** Run end-to-end tests against a separate local server and a temporary SQLite database, then remove the temporary directory after the run. This exercises the real UI, API, migrations, and database without modifying a developer's accounts.
 
 **Trade-off:** Browser installation and a full application build make these tests slower than Fastify injection tests. A forced termination or machine crash can leave a temporary folder behind; ordinary test failures are cleaned up. No external services are contacted.
+
+## Radix account menu
+
+Use the focused Radix Dropdown Menu primitive for keyboard and focus handling, with project CSS for appearance. This adds a web dependency but avoids implementing menu accessibility from scratch. No full component framework or router is introduced.

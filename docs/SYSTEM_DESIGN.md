@@ -152,3 +152,7 @@ CREATE TABLE digest_posts (
 ```
 
 The current application stores only hashes of session IDs. The planned API-key implementation will store key hashes, and the Jira implementation will encrypt tokens before persistence. OAuth state belongs to both a user and session; application checks must enforce that association and expiry. `pending` and `unknown` records prevent automatic repeat creation when the remote outcome is uncertain. For sitemap caching, migrations may add a last-modified or equivalent change marker after the actual sitemap behavior is verified. Retention and cleanup of expired sessions and OAuth states should be implemented without weakening replay protection.
+
+## UI foundation
+
+The signed-in shell uses a Radix dropdown for account actions and calls only the existing authentication API. The shell labels Jira functionality as unavailable; it does not contact Jira or introduce new server routes.

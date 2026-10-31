@@ -21,7 +21,8 @@ test("settings tabs provide honest unavailable states and keyboard navigation", 
   await expect(
     page.getByRole("button", { name: "Generate API key" }),
   ).toBeDisabled();
-  await expect(page.getByText(/planned.*not available/i)).toBeVisible();
+  await expect(page.getByText("Scanner endpoint:")).toBeVisible();
+  await expect(page.getByText("POST /api/v1/findings")).toBeVisible();
 });
 
 test("session expiry clears the draft and explains what happened", async ({

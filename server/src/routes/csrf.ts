@@ -9,6 +9,8 @@ export function csrfGuard(auth: AuthService) {
     request: FastifyRequest,
     reply: FastifyReply,
   ) {
+    // This route accepts only an explicit API-key header and never uses cookies.
+    if (request.routeOptions.url === "/api/v1/findings") return;
     // When a Jira or finding read carries a session token, bind its response to that
     // session even if the shared browser cookie changed between requests.
     const boundUserRead = request.method === "GET" &&

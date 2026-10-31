@@ -6,6 +6,7 @@ import type { SessionRecord } from '../db/authRepository.js';
 import { JiraConnection } from './connection.js';
 
 export type FindingInput = { project: string; title: string; description: string };
+export type FindingActor = { kind: 'session'; session: SessionRecord } | { kind: 'apiKey'; userId: string; siteId: string; projectId: string; requestIdentity: string; active: () => boolean };
 export class FindingError extends Error {
   constructor(public status: number, message: string, public issueKey?: string) { super(message); }
 }
@@ -33,52 +34,75 @@ export class FindingsService {
     return rows.map(row => ({ issueKey: row.issue_key, title: row.title, createdAt: row.created_at, url: `${row.site_url}/browse/${row.issue_key}` }));
   }
 
-  async create(session: SessionRecord, input: FindingInput, idempotencyKey: string, expectedSiteId?: string) {
-    const { client, site, credentialVersion, canWrite } = await this.connection.clientFor(session.id);
+  async create(session: SessionRecord, input: FindingInput, idempotencyKey: string, expectedSiteId?: string): Promise<{ issueKey: string; url: string; replay: boolean }>;
+  async create(session: FindingActor, input: FindingInput, idempotencyKey: string, expectedSiteId?: string): Promise<{ issueKey: string; url: string; replay: boolean }>;
+  async create(actor: SessionRecord | FindingActor, input: FindingInput, idempotencyKey: string, expectedSiteId?: string) {
+    const principal: FindingActor = 'kind' in actor ? actor : { kind: 'session', session: actor };
+    const userId = principal.kind === 'session' ? principal.session.id : principal.userId;
+    if (principal.kind === 'apiKey') {
+      const selected = this.db.prepare('SELECT cloud_id FROM jira_sites WHERE user_id = ?').get(userId) as { cloud_id: string } | undefined;
+      if (selected?.cloud_id !== principal.siteId) throw new FindingError(403, 'API key site is not selected.');
+    }
+    const { client, site, credentialVersion, canWrite } = await this.connection.clientFor(userId);
+    if (principal.kind === 'apiKey' && site.cloud_id !== principal.siteId) throw new FindingError(403, 'API key site is not selected.');
     if (expectedSiteId && site.cloud_id !== expectedSiteId) throw new FindingError(409, 'Jira site changed.');
     return this.enqueue(site.cloud_id, async () => {
       if (!canWrite) throw new FindingError(403, 'Reconnect Jira to grant issue creation access.');
       const keyHash = hash(idempotencyKey);
-      const requestHash = hash(JSON.stringify([site.cloud_id, input.project, input.title, input.description]));
-      const existing = this.operation(session.id, keyHash);
-      if (existing) return this.previous(session.id, site.cloud_id, existing, requestHash);
+      const requestHash = principal.kind === 'apiKey'
+        ? hash(JSON.stringify([site.cloud_id, principal.requestIdentity]))
+        : hash(JSON.stringify([site.cloud_id, input.project, input.title, input.description]));
+      if (principal.kind === 'apiKey' && !principal.active()) throw new FindingError(401, 'Invalid API key');
+      const existing = this.operation(userId, keyHash);
+      if (existing && principal.kind === 'session') return this.previous(userId, site.cloud_id, existing, requestHash);
       const projects = await this.connection.projectList(client);
-      if (!projects.some(project => project.key === input.project)) throw new FindingError(403, 'Jira project is not available.');
+      const matches = projects.filter(project => project.key === input.project);
+      if (!matches.length) throw new FindingError(principal.kind === 'apiKey' ? 404 : 403, 'Jira project is not available.');
+      if (matches.length !== 1) throw new FindingError(502, 'Could not verify Jira projects.');
+      if (principal.kind === 'apiKey' && matches[0].id !== principal.projectId) throw new FindingError(403, 'Project is not permitted.');
+      if (existing) {
+        if (principal.kind === 'apiKey' && !principal.active()) throw new FindingError(401, 'Invalid API key');
+        const unchanged = this.db.prepare("SELECT 1 FROM jira_sites s JOIN jira_credentials c ON c.user_id = s.user_id WHERE s.user_id = ? AND s.cloud_id = ? AND s.site_url = ? AND c.access_token_enc = ? AND c.refresh_status = 'ready'")
+          .get(userId, site.cloud_id, site.site_url, credentialVersion);
+        if (!unchanged) throw new FindingError(409, 'Jira connection changed. Try again.');
+        return this.previous(userId, site.cloud_id, existing, requestHash);
+      }
       const type = await this.chooseIssueType(client, input.project);
-      const active = this.db.prepare('SELECT 1 FROM sessions WHERE id_hash = ? AND user_id = ? AND expires_at > ?').get(session.id_hash, session.id, new Date().toISOString());
-      if (!active) throw new FindingError(401, 'Not signed in');
+      const active = principal.kind === 'session' ? this.db.prepare('SELECT 1 FROM sessions WHERE id_hash = ? AND user_id = ? AND expires_at > ?').get(principal.session.id_hash, userId, new Date().toISOString()) : principal.active();
+      if (!active) throw new FindingError(401, principal.kind === 'session' ? 'Not signed in' : 'Invalid API key');
       const unchanged = this.db.prepare("SELECT 1 FROM jira_sites s JOIN jira_credentials c ON c.user_id = s.user_id WHERE s.user_id = ? AND s.cloud_id = ? AND s.site_url = ? AND c.access_token_enc = ? AND c.refresh_status = 'ready'")
-        .get(session.id, site.cloud_id, site.site_url, credentialVersion);
+        .get(userId, site.cloud_id, site.site_url, credentialVersion);
       if (!unchanged) throw new FindingError(409, 'Jira connection changed. Try again.');
       const reserved = this.db.prepare("INSERT INTO finding_operations (user_id, key_hash, request_hash, status) VALUES (?, ?, ?, 'pending') ON CONFLICT(user_id, key_hash) DO NOTHING")
-        .run(session.id, keyHash, requestHash);
-      if (!reserved.changes) return this.previous(session.id, site.cloud_id, this.operation(session.id, keyHash)!, requestHash);
+        .run(userId, keyHash, requestHash);
+      if (!reserved.changes) return this.previous(userId, site.cloud_id, this.operation(userId, keyHash)!, requestHash);
 
       let created: { id: string; key: string };
       try {
+        // Atlassian's Cloud create-issue example uses project.id: https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-post
         const result = await client.issues.createIssue({ fields: {
-          project: { key: input.project }, issuetype: { id: type }, summary: input.title,
+          project: principal.kind === 'apiKey' ? { id: principal.projectId } : { key: input.project }, issuetype: { id: type }, summary: input.title,
           description: { type: 'doc', version: 1, content: input.description.split(/\r\n|\r|\n/).map(line => line ? { type: 'paragraph', content: [{ type: 'text', text: line }] } : { type: 'paragraph' }) },
         } });
         created = { id: issueId.parse(result.id), key: issueKey.parse(result.key) };
         if (!created.key.startsWith(`${input.project}-`)) throw new Error('Unexpected issue project');
       } catch (error) {
         if (isApiError(error) && [400, 401, 403, 404, 422, 429].includes(error.status)) {
-          this.db.prepare("DELETE FROM finding_operations WHERE user_id = ? AND key_hash = ? AND status = 'pending'").run(session.id, keyHash);
+          this.db.prepare("DELETE FROM finding_operations WHERE user_id = ? AND key_hash = ? AND status = 'pending'").run(userId, keyHash);
           throw new FindingError(error.status === 429 ? 429 : 502, 'Jira rejected the finding.');
         }
-        this.markUnknown(session.id, keyHash);
+        this.markUnknown(userId, keyHash);
         throw new FindingError(502, 'The Jira outcome is unknown. Check Jira before retrying.');
       }
 
       try {
         this.db.transaction(() => {
           this.db.prepare('INSERT INTO created_issues (user_id, cloud_id, project_key, issue_key, issue_id, title, site_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-            .run(session.id, site.cloud_id, input.project, created.key, created.id, input.title, site.site_url, new Date().toISOString());
-          this.db.prepare("UPDATE finding_operations SET status = 'done', issue_key = ? WHERE user_id = ? AND key_hash = ? AND status = 'pending'").run(created.key, session.id, keyHash);
+            .run(userId, site.cloud_id, input.project, created.key, created.id, input.title, site.site_url, new Date().toISOString());
+          this.db.prepare("UPDATE finding_operations SET status = 'done', issue_key = ? WHERE user_id = ? AND key_hash = ? AND status = 'pending'").run(created.key, userId, keyHash);
         })();
       } catch {
-        this.markUnknown(session.id, keyHash);
+        this.markUnknown(userId, keyHash);
         throw new FindingError(502, 'Jira created the issue, but local recording failed. Do not retry.', created.key);
       }
       return { issueKey: created.key, url: `${site.site_url}/browse/${created.key}`, replay: false };

@@ -8,7 +8,7 @@ Use TypeScript in strict mode, React and Vite for the web interface, Fastify for
 
 ## Planned interfaces
 
-The browser calls only our API. Session-authenticated writes require a CSRF token. Health, authentication, Jira OAuth, site and project discovery, and session-authenticated finding creation and history are implemented. The Jira UI and API key management are implemented; the scanner endpoint and digest remain planned.
+The browser calls only our API. Session-authenticated writes require a CSRF token. Health, authentication, Jira OAuth, site and project discovery, and session-authenticated finding creation and history are implemented. The Jira UI and API key management are implemented; the scanner endpoint is implemented and the digest remains planned.
 
 | Interface | Purpose |
 | --- | --- |
@@ -76,7 +76,7 @@ The current slice connects settings, site selection, and project selection to th
 
 ### 5. External API
 
-The current slice adds API-key creation, listing, revocation, and site/project restrictions. The next slice adds scanner authentication, validates the stored site and project IDs, fails closed for records without project IDs, and implements the scanner endpoint, rate limits, idempotency, and a short OpenAPI document.
+API-key management and scanner authentication are implemented. The scanner verifies current Jira project IDs and key revocation, fails closed for legacy records without IDs, and uses the shared finding service with bounded input, rate limits, and idempotency. The contract is in [scanner-openapi.yaml](scanner-openapi.yaml). Owner-run live scanner and Docker checks remain outstanding.
 
 **Done when:** tests cover all documented response codes, hashed-only key storage, revoked keys, cross-user access, concurrent requests, body conflicts, and unknown outcomes.
 

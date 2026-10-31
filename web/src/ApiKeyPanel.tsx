@@ -93,7 +93,7 @@ export function ApiKeyPanel({ session, status, projects, projectsLoading, projec
   return (
     <section aria-labelledby="api-key-heading">
       <h2 id="api-key-heading">Scanner access</h2>
-      <p>Create keys restricted to projects on your selected Jira site. The scanner endpoint is not available yet.</p>
+      <p>Create keys restricted to projects on your selected Jira site. Use these keys to send findings from a scanner or CI system.</p>
       {secret && <div className="key-secret" role="status"><strong>Copy this key now</strong><p>It will not be shown again. Store it securely.</p><label>New API key<input readOnly value={secret} /></label><button className="secondary-button" onClick={() => setSecret("")}>Done</button></div>}
       {!status?.site ? <p>Connect Jira and select a site before generating a key.</p> : <>
         <p>Site: {status.site.name}</p>
@@ -110,7 +110,7 @@ export function ApiKeyPanel({ session, status, projects, projectsLoading, projec
       {notice && <p role="status">{notice}</p>}
       <h3>API keys</h3>
       {loading ? <p role="status">Loading API keys…</p> : listError && keys.length === 0 ? null : keys.length === 0 ? <p>No API keys yet.</p> : <ul className="key-list">{keys.map(key => <li key={key.id}><div><strong>{key.name}</strong> <span>{key.revokedAt ? "Revoked" : key.requiresReplacement ? "Needs replacement" : "Active"}</span>{!key.revokedAt && key.requiresReplacement && <p>Replace this key before using scanner access.</p>}<p>{key.prefix}… · {key.projects.join(", ")} · Site {status?.site?.id === key.siteId ? status.site.name : key.siteId}</p></div>{!key.revokedAt && <button className="secondary-button" disabled={busy} aria-label={`Revoke ${key.name} (${key.prefix})`} onClick={() => setPending(key)}>Revoke</button>}</li>)}</ul>}
-      <p>Planned endpoint — not available:</p><code>POST /api/v1/findings</code>
+      <p>Scanner endpoint:</p><code>POST /api/v1/findings</code>
       <AlertDialog.Root open={pending !== null} onOpenChange={open => { if (!open) setPending(null); }}>
         <AlertDialog.Portal><AlertDialog.Overlay className="dialog-overlay" /><AlertDialog.Content className="dialog"><AlertDialog.Title>Revoke API key?</AlertDialog.Title><AlertDialog.Description>Revoking {pending?.name} cannot be undone.</AlertDialog.Description><div className="dialog-actions"><AlertDialog.Cancel>Cancel</AlertDialog.Cancel><AlertDialog.Action disabled={busy} onClick={event => { event.preventDefault(); if (pending) void revoke(pending); }}>Confirm revoke</AlertDialog.Action></div></AlertDialog.Content></AlertDialog.Portal>
       </AlertDialog.Root>

@@ -6,6 +6,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
+    "discover:blog": "node dist/digest/discover-cli.js",
     "mock:atlassian": "tsx src/fake-atlassian/index.ts",
     "test": "vitest run --maxWorkers=1 --testTimeout=15000",
     "lint": "tsc --noEmit -p tsconfig.json"
@@ -19,6 +20,8 @@
     "better-sqlite3": "^11.8.1",
     "fastify": "^5.2.0",
     "jira.js": "6.3.0",
+    "parse5": "^8.0.0",
+    "saxes": "^6.0.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

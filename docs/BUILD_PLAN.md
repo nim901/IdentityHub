@@ -82,7 +82,7 @@ API-key management and scanner authentication are implemented. The scanner verif
 
 ### 6. AI blog digest
 
-Discover posts from the sitemap with a metadata cache, one request at a time, at least 500 ms between requests, bounded responses and timeouts, and an HTTPS host allowlist. Select the latest `datePublished` across the covered sitemap; explain the selection rule. Summarize untrusted article text with a configurable model adapter that has no tools, validate its output, and use the shared finding service. Do not store article text.
+Read-only discovery conservatively checks robots.txt and uses the sitemap advertised by Oasis, bounded same-origin HTTPS requests, and the visible article heading and “Published on” date. Observed JSON-LD publication dates can be re-stamped, so they are not used for ordering. It selects the latest publication day and reports the number of same-day candidates with a deterministic URL tie-breaker. An optional bounded in-memory metadata cache uses `lastmod` and a one-hour TTL. Requests are serialized in one process, spaced at least 500 ms, and bounded by size and time; a timeout disables further discovery until restart. Summarize untrusted article text with a configurable model adapter that has no tools, validate its output, and use the shared finding service. Do not store article text.
 
 **Done when:** fake-only tests cover out-of-order listings, re-stamped dates, crawl and parse failures, model errors, output validation, injection attempts, and duplicate states. `--dry-run` creates no ticket; `--require-ai` fails if the model is unavailable. Without that flag, extractive fallback is explicitly marked degraded and exits with code 3. Choose a provider before implementing its adapter and check its current documentation.
 

@@ -7,6 +7,8 @@ import {
   type JiraStatus,
 } from "./jiraApi";
 import type { Session } from "./authApi";
+import { ApiKeyPanel } from "./ApiKeyPanel";
+import type { JiraProject } from "./jiraApi";
 
 type Props = {
   session: Session;
@@ -15,6 +17,11 @@ type Props = {
   refresh: () => Promise<void>;
   onSessionChanged: () => void;
   callbackNotice: string;
+  projects: JiraProject[];
+  projectsLoading: boolean;
+  projectError: string;
+  keyCreating: boolean;
+  onKeyCreationChange: (operation: symbol, active: boolean) => void;
 };
 
 export function Settings({
@@ -24,6 +31,11 @@ export function Settings({
   refresh,
   onSessionChanged,
   callbackNotice,
+  projects,
+  projectsLoading,
+  projectError,
+  keyCreating,
+  onKeyCreationChange,
 }: Props) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [sites, setSites] = useState<JiraSite[]>([]);
@@ -116,7 +128,7 @@ export function Settings({
       <p className="subtitle">Manage your connections and scanner access.</p>
       <Tabs.Root defaultValue="jira">
         <Tabs.List className="settings-tabs" aria-label="Settings sections">
-          <Tabs.Trigger value="jira">Jira connection</Tabs.Trigger>
+          <Tabs.Trigger value="jira" disabled={keyCreating}>Jira connection</Tabs.Trigger>
           <Tabs.Trigger value="api">API access</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="jira" className="settings-panel">
@@ -220,13 +232,7 @@ export function Settings({
           {error && <p role="alert">{error}</p>}
         </Tabs.Content>
         <Tabs.Content value="api" className="settings-panel">
-          <h2>Scanner access</h2>
-          <p>API key management is not available yet.</p>
-          <button className="primary-button" disabled>
-            Generate API key
-          </button>
-          <p>Planned endpoint — not available:</p>
-          <code>POST /api/v1/findings</code>
+          <ApiKeyPanel key={session.csrfToken} session={session} status={status} projects={projects} projectsLoading={projectsLoading} projectError={projectError} onSessionChanged={onSessionChanged} onKeyCreationChange={onKeyCreationChange} />
         </Tabs.Content>
       </Tabs.Root>
     </main>

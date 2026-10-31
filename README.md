@@ -1,6 +1,6 @@
 # IdentityHub
 
-IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth, encrypted rotating credentials, site and project discovery, and a session-authenticated finding-to-Jira API. The Jira connection, site and project selection, finding form, and recent-ticket UI are implemented; external API keys and AI digest remain incomplete. The owner has completed a live OAuth callback and saved a Jira site; live project discovery and ticket creation remain unverified.
+IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth, encrypted rotating credentials, site and project discovery, and a session-authenticated finding-to-Jira API. The Jira connection, site and project selection, finding form, and recent-ticket UI are implemented; API key management is implemented; the scanner endpoint and AI digest remain incomplete. The owner has completed a live OAuth callback and saved a Jira site; live project discovery and ticket creation remain unverified.
 
 ## Requirements
 
@@ -74,7 +74,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The command builds the app and runs browser tests in six groups, each with a separate local server and temporary SQLite database. Each group gets a fresh rate-limit state. The browser server uses fake Jira configuration and transport, including separate missing-configuration, invalid-key, and failed-exchange scenarios. It clears inherited Jira credentials and rejects unexpected provider requests. The databases are removed afterward; the tests do not use the Docker volume or your local app database. A forced process termination or machine crash may leave a temporary `identityhub-e2e-` folder in the system temporary directory.
+The command builds the app and runs browser tests in seven groups, each with a separate local server and temporary SQLite database. Each group gets a fresh rate-limit state. The browser server uses fake Jira configuration and transport, including separate missing-configuration, invalid-key, and failed-exchange scenarios. It clears inherited Jira credentials and rejects unexpected provider requests. The databases are removed afterward; the tests do not use the Docker volume or your local app database. A forced process termination or machine crash may leave a temporary `identityhub-e2e-` folder in the system temporary directory.
 
 To run tests inside Docker, including rebuilding the test image after changes:
 
@@ -98,6 +98,9 @@ Server tests use an in-memory SQLite database and run one test file at a time, w
 | `GET /api/jira/status` | Read the signed-in user's saved connection and selected-site status. |
 | `GET /api/jira/sites`, `POST /api/jira/site` | List accessible Jira sites and select one (JSON `id`). |
 | `GET /api/jira/projects` | List projects in the selected site. |
+| `GET /api/keys` | List the signed-in user's API key metadata. |
+| `POST /api/keys` | Create a site- and project-restricted key; returns the secret once and requires CSRF. |
+| `DELETE /api/keys/:id` | Revoke the signed-in user's key; requires CSRF. |
 | `POST /api/findings` | Create a ticket from `project`, `title`, and `description`; accepts an optional expected `siteId` and requires a unique 16–128 character `Idempotency-Key` and CSRF token. |
 | `GET /api/findings?project=KEY` | Return up to ten of the signed-in user's locally recorded tickets. An optional `siteId` binds the request to the expected site. |
 
@@ -133,7 +136,7 @@ The start endpoint requests `read:jira-work`, `write:jira-work` and `offline_acc
 - `server/src/routes/` handles HTTP and CSRF checks; `server/src/services/` contains authentication logic; `server/src/db/` contains the SQLite connection and authentication repository; `server/migrations/` defines the database schema.
 - [Build plan](docs/BUILD_PLAN.md), [system design](docs/SYSTEM_DESIGN.md), and [trade-offs](docs/tradeoffs.md) describe the planned work and decisions. [Changelog](CHANGELOG.md) records completed phases.
 
-Next phases add API keys and the external API, and implement the AI digest. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
+Next phases add the external scanner API and implement the AI digest. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
 
 ## UI foundation
 
@@ -141,7 +144,7 @@ The signed-in interface includes a responsive account shell and an accessible ac
 
 The Findings view shows up to ten app-created tickets for the selected project. The reporting view keeps its draft in memory until submission and creates a Jira ticket through the API. Leaving with a nonempty draft prompts for confirmation. Browsers control the reload or tab-close warning and may suppress it, especially on mobile. Drafts are lost on reload or process termination. Views do not create browser history entries or support deep links.
 
-Settings supports Jira connection and site selection when the server is configured. When configuration is missing or invalid, the connection button remains disabled and setup guidance identifies the required server variables. A failed project lookup offers a retry. API key management remains unavailable. Session checks on focus or visibility changes retain drafts on temporary failures and clear them on confirmed expiry or account changes. If sign-out fails, the application does not claim the server session ended.
+Settings supports Jira connection and site selection when the server is configured. When configuration is missing or invalid, the connection button remains disabled and setup guidance identifies the required server variables. A failed project lookup offers a retry. API key management can create, list, and revoke project-restricted keys; the scanner endpoint remains unavailable. Session checks on focus or visibility changes retain drafts on temporary failures and clear them on confirmed expiry or account changes. If sign-out fails, the application does not claim the server session ended.
 
 The project-local Fastify reference and the current authentication review are described in [the backend review](docs/BACKEND_REVIEW.md). Its third-party examples are guidance, subject to this project's security and design decisions.
 
@@ -156,3 +159,9 @@ Provider responses are bounded, timed out and restricted to fixed Atlassian endp
 For a local OAuth callback, open the app served by the API at port 3000 (build the web app first). The callback returns to that origin. Select an accessible site in Settings and then a project in Findings. The selected project is held in memory. Creation uses an idempotency key, and recent history is scoped to the signed-in user and selected project. The browser sends its expected site ID with finding and history requests; the API rejects a changed site. For compatibility, older API callers may omit the site ID and then use the currently selected site. Saved connection status does not guarantee the provider still grants access; reconnect if discovery fails.
 
 Finding submissions are never silently retried. If the outcome is unknown, check Jira before attempting another creation; an explicit acknowledgment is required before resubmitting from the current draft. Drafts and that acknowledgment do not survive reloads. The history page shows only tickets recorded by IdentityHub, so an issue whose local recording failed may be absent.
+
+## API key management
+
+In Settings → API access, connect Jira and select a site, name a key, and select one to twenty accessible projects. The secret is shown only once; copy it before leaving the panel. IdentityHub stores a SHA-256 hash and a short identifying prefix, not the full key. Keys are bound to the selected site, user, and discovered Jira project IDs as well as their display keys; they can be revoked even after the Jira connection is lost. If creation cannot be confirmed, check the list and revoke an unwanted key before trying again. Navigation is disabled during creation and browsers are asked to warn before unloading; browsers may suppress that warning. The list shows up to 100 keys, with active keys first; at most 20 keys may be active.
+
+The external scanner endpoint is not implemented yet, so generated keys cannot authenticate scanner requests in this phase. The future endpoint must enforce the stored user, site, project IDs, and revocation, and reject older records that lack project IDs until those keys are replaced. Existing records without project IDs remain listable and revocable and are labelled “Needs replacement.” The new SQLite migrations are applied on server startup, including in the existing Docker setup; no new configuration variables are required. Docker build and runtime behavior remain unverified in this environment.

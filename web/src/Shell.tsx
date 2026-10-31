@@ -126,6 +126,11 @@ export function Shell({
   const [ticketsError, setTicketsError] = useState("");
   const [historyVersion, setHistoryVersion] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [keyCreation, setKeyCreation] = useState<symbol | null>(null);
+  const keyCreating = keyCreation !== null;
+  const onKeyCreationChange = useCallback((operation: symbol, active: boolean) => {
+    setKeyCreation(current => active ? operation : current === operation ? null : current);
+  }, []);
   const submissionLock = useRef(false);
   const [submitError, setSubmitError] = useState("");
   const [uncertain, setUncertain] = useState(false);
@@ -162,14 +167,14 @@ export function Shell({
   const hasDraft = Boolean(draft.project || draft.title || draft.description);
 
   useEffect(() => {
-    if (!hasDraft) return;
+    if (!hasDraft && !keyCreating) return;
     function warnBeforeLeaving(event: BeforeUnloadEvent) {
       event.preventDefault();
       event.returnValue = "";
     }
     window.addEventListener("beforeunload", warnBeforeLeaving);
     return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
-  }, [hasDraft]);
+  }, [hasDraft, keyCreating]);
 
   useEffect(() => {
     if (view === "findings" && focusFindings) heading.current?.focus();
@@ -204,7 +209,7 @@ export function Shell({
   }
 
   function leave(destination: Destination) {
-    if (submissionLock.current) return;
+    if (submissionLock.current || keyCreating) return;
     if (hasDraft) {
       returnFocus.current =
         destination === "signout"
@@ -246,14 +251,14 @@ export function Shell({
         <nav aria-label="Main navigation">
           <button
             className={view !== "settings" ? "active" : ""}
-            disabled={submitting}
+            disabled={submitting || keyCreating}
             onClick={() => leave("findings")}
           >
             Findings
           </button>
           <button
             className={view === "settings" ? "active" : ""}
-            disabled={submitting}
+            disabled={submitting || keyCreating}
             onClick={() => leave("settings")}
           >
             Settings
@@ -262,7 +267,7 @@ export function Shell({
         <DropdownMenu.Root>
           <DropdownMenu.Trigger
             ref={accountButton}
-            disabled={submitting}
+            disabled={submitting || keyCreating}
             className="account"
             aria-label={`Account: ${session.user.email}`}
           >
@@ -305,6 +310,11 @@ export function Shell({
           session={session}
           status={jira}
           statusError={jiraError}
+          keyCreating={keyCreating}
+          onKeyCreationChange={onKeyCreationChange}
+          projects={projects}
+          projectsLoading={projectsLoading}
+          projectError={projectError}
           refresh={refreshJira}
           onSessionChanged={onSessionChanged}
           callbackNotice={

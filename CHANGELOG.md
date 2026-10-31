@@ -2,7 +2,14 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 5B - Scanner API (in review)
+## Phase 6A - Read-only blog discovery (in review)
+
+- Add a bounded discovery library and read-only command using the Oasis sitemap. Select by the visible publication date and heading, and report same-day ties; observed JSON-LD publication timestamps can be re-stamped.
+- Review fixed acceptance of cached metadata with mismatched URLs, invalid dates, or unsafe titles; invalid entries are ignored and refetched.
+- Automated tests use fake transports. An authorized read-only inspection confirmed robots.txt, sitemap structure, and article markup; a crawl of 110 posts passed before the conservative robots check was added. AI summarization and ticket creation remain future work.
+- Review verification: 60 server tests, 28 browser tests, lint, and build passed. A regression first reproduced an unsafe cached URL; new tests also cover invalid cache records and overlapping streaming bodies. Earlier tests exposed the sitemap-entry limit, extra headings, and a Windows loader-path issue. The final robots check was verified with fakes, not another live crawl. Production audit reports the existing three moderate `@fastify/static`, `glob`, and `minimatch` findings. Docker was unavailable.
+
+## Phase 5B - Scanner API (merged, PR #18)
 
 - Add API-key-authenticated finding creation, project-ID and site checks, revocation rechecks, bounded input, rate limiting, and optional idempotency via the shared Jira finding service.
 - Review fixed conflicting scanner requests being treated as replays when their fields formatted to the same Jira description, and corrected stale endpoint availability text. Previous uncommitted scanner fingerprints fail closed on replay.

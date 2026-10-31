@@ -9,7 +9,8 @@
     "discover:blog": "node dist/digest/discover-cli.js",
     "mock:atlassian": "tsx src/fake-atlassian/index.ts",
     "test": "vitest run --maxWorkers=1 --testTimeout=15000",
-    "lint": "tsc --noEmit -p tsconfig.json"
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "preview:blog": "node dist/digest/preview-cli.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",

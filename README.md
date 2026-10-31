@@ -115,7 +115,7 @@ Authentication responses include `Cache-Control: no-store`. Session checks have 
 
 Passwords are stored as Argon2id hashes. Session cookies are HttpOnly and SameSite=Lax, and are marked Secure when `APP_BASE_URL` uses HTTPS. The cookie contains a random session identifier; only its hash is stored in SQLite. Security headers and request size limits are enabled. This is a single-instance proof of concept, not a production-ready deployment.
 
-The account implementation does not use `SESSION_SECRET`; AI settings remain placeholders. The root `digest` command remains a placeholder.
+The account implementation does not use `SESSION_SECRET`. The root `digest` command remains a placeholder; the separate read-only summary preview is described below.
 
 ## Local fake Atlassian service
 
@@ -184,3 +184,14 @@ Oasis article pages inspected on 2026-10-31 show a visible “Published on” da
 The command stops if robots.txt contains a nonempty disallow or nonzero crawl delay in any group, lacks a wildcard user-agent, no longer advertises the expected sitemap, or includes unsupported directives. This conservative policy can stop for restrictions intended for other crawlers. The library follows only allowed HTTPS sitemap and blog URLs, rejects redirects and DTDs, and fails if traversal or article metadata is incomplete. Limits are 8 sitemaps, 5,000 entries per sitemap, 250 blog posts, 1 MiB per response, and 10 seconds per request. Requests are serialized within one process with at least 500 ms between them; a timeout disables discovery in that process until restart. An optional in-memory metadata cache lasts at most one hour when sitemap `lastmod` is unchanged and can be stale if the site changes without changing `lastmod`. Cached entries with mismatched URLs or invalid titles or dates are ignored and refetched; only trusted application code should populate the cache. The command creates a fresh cache each run. No article text is stored. On 2026-10-31, an authorized read-only crawl of the sitemap and 110 blog pages completed before the robots check was added; automated tests of the final robots check use fakes.
 
 The `saxes` and `parse5` dependencies parse untrusted XML and HTML. Automated tests inject fake transports and never contact Oasis. Docker uses the existing install and build steps with no new configuration; its build and runtime remain unverified here.
+
+
+## Read-only summary preview
+
+After `npm run build`, set `AI_MODEL` and `AI_API_KEY` in the shell and run `npm run preview:blog`. Local commands do not load `.env` automatically. Docker Compose loads `.env` into its app container. The command discovers the latest publication day, fetches the selected article, and sends bounded article text to the OpenAI Responses API. It prints metadata and a plain-text summary as JSON; it does not create a Jira issue. This sends article content to OpenAI and may incur API charges. Never commit the API key.
+
+The body extractor requires exactly one `div` with both `blog-rich-text` and `w-richtext` classes. An authorized read-only inspection of one Oasis article confirmed this markup; automated tests use synthetic fixtures. Missing or ambiguous bodies fail closed. Before summarization, the refetched article must still have the title and publication date selected during discovery; body changes with unchanged metadata cannot be detected. The model receives no tools and is instructed to treat the article as untrusted input; this reduces risk but does not guarantee resistance to prompt injection or hallucination. Responses are not stored through the API (`store: false`); article text is not persisted by IdentityHub. Validate summaries before use. The preview fails on model errors or invalid output; degraded fallback and Jira creation are later work.
+
+The adapter currently uses an OpenAI API key. Eligible ChatGPT Pro or Business owners may be able to link their subscription to an API organization and use [subscription API credits](https://developers.openai.com/api/docs/guides/chatgpt-api-credits). OpenAI also documents [ChatGPT plan authorization for eligible open-source apps](https://developers.openai.com/siwc/token-sharing-open-source); IdentityHub does not yet implement that separate sign-in flow.
+
+The existing Docker runtime image includes the compiled preview, and Compose passes the configured environment into the app container. Container build and preview behavior have not been verified for this slice because Docker was unavailable.

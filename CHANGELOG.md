@@ -2,7 +2,14 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 6A - Read-only blog discovery (in review)
+## Phase 6B - Article summary preview (in review)
+
+- Add a read-only summary preview with bounded article extraction and a tool-free OpenAI Responses adapter. The selected article is untrusted, its text stays in memory, and the provider response is validated.
+- Tests use fake transports only. An authorized read-only check of one Oasis article confirmed the body selector; OpenAI compatibility remains unverified. Direct ChatGPT plan OAuth and the Jira-writing digest command are not implemented.
+- Review fixes reject changed article metadata before model use, validate configuration before discovery, and isolate the fake CLI child environment. Fake tests cover those cases and a stalled model request.
+- Review verification: 76 server tests, lint, and build passed after the fixes. Browser tests were not rerun because this slice changes no browser flow. Docker was unavailable, so container behavior remains unverified.
+
+## Phase 6A - Read-only blog discovery (merged, PR #19)
 
 - Add a bounded discovery library and read-only command using the Oasis sitemap. Select by the visible publication date and heading, and report same-day ties; observed JSON-LD publication timestamps can be re-stamped.
 - Review fixed acceptance of cached metadata with mismatched URLs, invalid dates, or unsafe titles; invalid entries are ignored and refetched.

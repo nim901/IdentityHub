@@ -2,7 +2,14 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 4B.2 - Finding creation and recent tickets (in review)
+## Phase 5A - API key management (in review)
+
+- Add user-scoped key creation, listing, and revocation with SHA-256 hashes, one-time display, and selected-site and project restrictions. Scanner authentication and the scanner endpoint remain for the next slice.
+- Review fixed loss of the one-time secret when leaving during creation. New keys record discovered project IDs alongside keys; an additive migration preserves legacy records with missing IDs for future scanner authentication to reject until replaced.
+- Use isolated browser and server tests; the key browser scenarios run in a separate test group to avoid sharing authentication rate limits. No real provider requests are made by tests.
+- Review verification: 34 server tests, lint, build, and 27 browser tests passed with fake providers and isolated data. Regression tests first exposed the pending-navigation issue and legacy-key handling; an intermediate full run used a stale build and failed before the final passing run. An earlier browser run hit shared registration rate limits; isolating the key group fixed that test-harness failure. A failed regression test left a synthetic temporary database folder because automatic policy blocked its removal. Docker is unavailable, and the scanner endpoint and owner-run live verification remain outstanding.
+
+## Phase 4B.2 - Finding creation and recent tickets (merged, PR #16)
 
 - Connect the form and project-scoped recent-ticket view to the session-authenticated finding API; validate Jira links before opening them in a new tab.
 - Prevent concurrent submissions, use one idempotency key per attempt, and require checking Jira before another attempt after an uncertain outcome. Drafts and uncertainty acknowledgment are in memory only.

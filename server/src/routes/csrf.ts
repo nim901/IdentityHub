@@ -12,7 +12,7 @@ export function csrfGuard(auth: AuthService) {
     // When a Jira or finding read carries a session token, bind its response to that
     // session even if the shared browser cookie changed between requests.
     const boundUserRead = request.method === "GET" &&
-      (request.routeOptions.url?.startsWith("/api/jira/") || request.routeOptions.url === "/api/findings") &&
+      (request.routeOptions.url?.startsWith("/api/jira/") || request.routeOptions.url === "/api/findings" || request.routeOptions.url?.startsWith("/api/keys")) &&
       request.headers["x-csrf-token"] !== undefined;
     if (!WRITE_METHODS.has(request.method) && !boundUserRead) return;
     const session = auth.session(request.cookies[SESSION_COOKIE]);

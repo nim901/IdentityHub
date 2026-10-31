@@ -503,3 +503,11 @@ h2 {
 
 .composer label.acknowledge { display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; }
 .composer .acknowledge input { display: inline-block; flex: 0 0 auto; width: 18px; height: 18px; min-height: 0; margin: 3px 0 0; padding: 0; }
+
+.key-name, .key-secret label { display: block; margin: 20px 0; font-weight: 600; }
+.key-name input, .key-secret input { display: block; width: 100%; max-width: 480px; padding: 10px; margin-top: 8px; font: inherit; }
+.key-project { display: block; margin: 10px 0; }
+.key-secret { background: #eff5ee; border: 1px solid #91ad9f; padding: 16px; margin: 20px 0; overflow-wrap: anywhere; }
+.key-list { padding: 0; list-style: none; }
+.key-list li { display: flex; gap: 16px; justify-content: space-between; align-items: center; border-top: 1px solid #d9dcd5; padding: 14px 0; }
+.key-list p { overflow-wrap: anywhere; color: #606862; }

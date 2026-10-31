@@ -38,7 +38,7 @@ it('creates a finding safely, prevents duplicate requests and isolates recent ti
   const { a, b } = await createTwoUsers(app);
   const start = await app.inject({ method: 'POST', url: '/api/jira/connect', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken } });
   const state = new URL(start.json().authorizationUrl).searchParams.get('state');
-  expect((await app.inject({ url: `/api/jira/callback?code=fake-code&state=${state}`, headers: { cookie: a.cookie } })).statusCode).toBe(200);
+  expect((await app.inject({ url: `/api/jira/callback?code=fake-code&state=${state}`, headers: { cookie: a.cookie } })).statusCode).toBe(303);
   expect((await app.inject({ method: 'POST', url: '/api/jira/site', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken }, payload: { id: 'site-one' } })).statusCode).toBe(200);
   const payload = { project: 'ONE', title: 'Finding', description: '<script>not markup</script>' };
   const request = (id: string) => app.inject({ method: 'POST', url: '/api/findings', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken, 'idempotency-key': id }, payload });

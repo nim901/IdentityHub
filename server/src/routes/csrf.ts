@@ -9,7 +9,12 @@ export function csrfGuard(auth: AuthService) {
     request: FastifyRequest,
     reply: FastifyReply,
   ) {
-    if (!WRITE_METHODS.has(request.method)) return;
+    // When a Jira read carries a session token, bind its response to that
+    // session even if the shared browser cookie changed between requests.
+    const boundJiraRead = request.method === "GET" &&
+      request.routeOptions.url?.startsWith("/api/jira/") &&
+      request.headers["x-csrf-token"] !== undefined;
+    if (!WRITE_METHODS.has(request.method) && !boundJiraRead) return;
     const session = auth.session(request.cookies[SESSION_COOKIE]);
     if (!session) return;
     const header = request.headers["x-csrf-token"];

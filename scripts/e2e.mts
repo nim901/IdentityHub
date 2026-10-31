@@ -54,20 +54,33 @@ function waitForExit(child: ChildProcess): Promise<number> {
   });
 }
 
-async function run(testArguments: string[]) {
+async function run(testArguments: string[], scenario = "success") {
   const port = await availablePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const directory = await mkdtemp(join(tmpdir(), "identityhub-e2e-"));
-  const server = spawn(process.execPath, ["dist/index.js"], {
-    cwd: resolve("server"),
-    env: {
-      ...process.env,
-      DATABASE_PATH: join(directory, "e2e.db"),
-      PORT: String(port),
-      APP_BASE_URL: baseUrl,
+  const fakeRequestLog = join(directory, "fake-requests.log");
+  const server = spawn(
+    process.execPath,
+    ["--import", "tsx", "scripts/e2e-server.mts"],
+    {
+      cwd: resolve("."),
+      env: {
+        ...process.env,
+        ATLASSIAN_CLIENT_ID: "",
+        ATLASSIAN_CLIENT_SECRET: "",
+        OAUTH_REDIRECT_URI: "",
+        ENCRYPTION_KEY: "",
+        ATLASSIAN_AUTH_BASE: "",
+        ATLASSIAN_AUTH_BROWSER_BASE: "",
+        E2E_JIRA_SCENARIO: scenario,
+        E2E_FAKE_REQUEST_LOG: fakeRequestLog,
+        DATABASE_PATH: join(directory, "e2e.db"),
+        PORT: String(port),
+        APP_BASE_URL: baseUrl,
+      },
+      stdio: "pipe",
     },
-    stdio: "pipe",
-  });
+  );
   let runner: ChildProcess | undefined;
   let interrupted = false;
 
@@ -84,10 +97,18 @@ async function run(testArguments: string[]) {
     if (interrupted) throw new Error("E2E run interrupted");
     runner = spawn(
       process.execPath,
-      [resolve("node_modules/@playwright/test/cli.js"), "test", ...testArguments],
+      [
+        resolve("node_modules/@playwright/test/cli.js"),
+        "test",
+        ...testArguments,
+      ],
       {
         stdio: "inherit",
-        env: { ...process.env, E2E_BASE_URL: baseUrl },
+        env: {
+          ...process.env,
+          E2E_BASE_URL: baseUrl,
+          E2E_FAKE_REQUEST_LOG: fakeRequestLog,
+        },
       },
     );
     const result = await waitForExit(runner);
@@ -103,5 +124,9 @@ async function run(testArguments: string[]) {
   }
 }
 
-await run(["--grep-invert", "@verification"]);
+await run(["--grep-invert", "@verification|@jira"]);
 if (!process.exitCode) await run(["--grep", "@verification"]);
+if (!process.exitCode) await run(["--grep", "@jira(?:\\s|$)"]);
+if (!process.exitCode) await run(["--grep", "@jira-missing"], "missing");
+if (!process.exitCode) await run(["--grep", "@jira-invalid"], "invalid");
+if (!process.exitCode) await run(["--grep", "@jira-exchange"], "exchange");

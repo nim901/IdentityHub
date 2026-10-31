@@ -30,7 +30,7 @@ export function FindingComposer({ draft, onChange, onBack }: Props) {
       <p className="subtitle">Prepare details for a Jira ticket.</p>
       <div className="destination">
         <strong>Destination project</strong>
-        <span>Not connected</span>
+        <span>{draft.project || "No project selected"}</span>
       </div>
       <p className="draft-notice">
         Draft only in this version. Nothing is saved or sent.
@@ -65,7 +65,7 @@ export function FindingComposer({ draft, onChange, onBack }: Props) {
         />
       </label>
       <div className="composer-footer">
-        <p>Ticket creation is unavailable until Jira integration is added.</p>
+        <p>Ticket creation will be available in the next phase.</p>
         <button className="primary-button" disabled>
           Create ticket
         </button>

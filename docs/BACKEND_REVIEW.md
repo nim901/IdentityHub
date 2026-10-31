@@ -1,6 +1,6 @@
 # Backend and session review
 
-Review scope: current Fastify authentication, session and CSRF handling, repositories, and the browser's existing session integration. This is a review of the current implementation, not an assessment of unimplemented Jira, API-key, or digest services.
+Review scope: Fastify authentication, session and CSRF handling, repositories, and browser session integration at the time of the review. Jira backend and connection UI were added afterward; API-key and digest services remain unimplemented.
 
 ## Findings
 
@@ -13,7 +13,7 @@ Review scope: current Fastify authentication, session and CSRF handling, reposit
 - Cookie flags, CSRF checks, generic login errors, login rate limiting, and security headers are covered in `server/test/auth.test.ts`. The two-user helper verifies session separation and rejects another user's CSRF token. The limiter is in memory and is not a distributed abuse control.
 - Registration and login input is validated with Zod. The duplicate-registration response intentionally reveals account existence; the trade-off is documented in `docs/tradeoffs.md`.
 - The browser tests cover expiry, temporary failure, failed sign-out, and a real local two-user account switch across tabs. The latter checks that an open draft and project key are cleared on session refresh. Provider integration and resource isolation remain future work.
-- Only authentication and health routes exist. Future user-owned resources still need authorization, scoped queries, isolation tests, safe provider errors, outbound timeouts, and secret-handling tests as they are implemented.
+- At the time of this review only authentication and health routes existed. Jira and findings routes were added later and require their own continuing security and isolation review.
 
 ## Fastify reference
 

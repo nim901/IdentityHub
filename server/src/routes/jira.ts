@@ -12,6 +12,11 @@ const querySchema = z.object({
 }).refine(q => Boolean(q.code) !== Boolean(q.error));
 
 export async function jiraRoutes(app: FastifyInstance, auth: AuthService, oauth?: JiraOAuth, connection?: JiraConnection) {
+  app.get('/api/jira/status', async (request, reply) => {
+    const session = auth.session(request.cookies[SESSION_COOKIE]);
+    if (!session) return reply.code(401).send({ error: 'Not signed in' });
+    return connection?.status(session.id) ?? { configured: false, connected: false, site: null };
+  });
   app.post('/api/jira/connect', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const session = auth.session(request.cookies[SESSION_COOKIE]);
     if (!session) return reply.code(401).send({ error: 'Not signed in' });
@@ -20,18 +25,18 @@ export async function jiraRoutes(app: FastifyInstance, auth: AuthService, oauth?
   });
   app.get('/api/jira/callback', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     const session = auth.session(request.cookies[SESSION_COOKIE]);
-    if (!session) return reply.code(401).send({ error: 'Not signed in' });
+    if (!session) return reply.redirect('/?jira=expired', 303);
     const input = querySchema.safeParse(request.query);
     if (!oauth || !input.success || !oauth.consume(session, input.data.state)) {
-      return reply.code(400).send({ error: 'Invalid or expired connection request' });
+      return reply.redirect('/?jira=failed', 303);
     }
-    if (input.data.error) return reply.code(400).send({ error: 'Jira authorization was not completed' });
+    if (input.data.error) return reply.redirect('/?jira=failed', 303);
     try {
-      if (!await oauth.exchangeAndStore(session, input.data.code!)) return reply.code(401).send({ error: 'Not signed in' });
+      if (!await oauth.exchangeAndStore(session, input.data.code!)) return reply.redirect('/?jira=expired', 303);
     } catch {
-      return reply.code(502).send({ error: 'Jira authorization could not be completed. Start again.' });
+      return reply.redirect('/?jira=failed', 303);
     }
-    return { message: 'Jira credentials saved. Select a Jira site.' };
+    return reply.redirect('/?jira=connected', 303);
   });
   app.get('/api/jira/sites', async (request, reply) => {
     const session = auth.session(request.cookies[SESSION_COOKIE]);

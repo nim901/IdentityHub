@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AuthForm } from "./AuthForm";
 import { Shell } from "./Shell";
 import { errorMessage, getSession, signOut, type Session } from "./authApi";
@@ -8,12 +8,21 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("jira") !== "expired") return "";
+    url.searchParams.delete("jira");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    return "Your session ended during Jira connection. Please sign in and start again.";
+  });
   const [retry, setRetry] = useState(0);
   const [signingOut, setSigningOut] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
+  const [sessionRefresh, setSessionRefresh] = useState(0);
   const requestVersion = useRef(0);
   const refreshController = useRef<AbortController | null>(null);
+  const currentSession = useRef<Session | null>(session);
+  currentSession.current = session;
 
   useEffect(() => {
     let active = true;
@@ -56,6 +65,7 @@ export default function App() {
           );
         } else {
           setSession(current);
+          setSessionRefresh((value) => value + 1);
           setMessage(
             current.user.id === currentUserId
               ? ""
@@ -101,6 +111,16 @@ export default function App() {
     setSession(current);
   }
 
+  const handleSessionChanged = useCallback((expected: Session) => {
+    if (currentSession.current?.user.id !== expected.user.id ||
+        currentSession.current.csrfToken !== expected.csrfToken) return;
+    ++requestVersion.current;
+    setSession(null);
+    setNotice(
+      "Your session or account changed. Any unsent draft was cleared. Please sign in again.",
+    );
+  }, []);
+
   if (loading)
     return (
       <main className="auth-page">
@@ -122,7 +142,9 @@ export default function App() {
         <Shell
           key={session.user.id}
           session={session}
+          sessionRefresh={sessionRefresh}
           onSignOut={handleSignOut}
+          onSessionChanged={handleSessionChanged}
         />
         {message && (
           <p className="wrap" role="alert">

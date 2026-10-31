@@ -1,18 +1,121 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { FindingComposer, type FindingDraft } from "./FindingComposer";
 import { Settings } from "./Settings";
 import type { Session } from "./authApi";
+import {
+  jiraRequest,
+  SessionChanged,
+  type JiraProject,
+  type JiraStatus,
+} from "./jiraApi";
 
-type Props = { session: Session; onSignOut: () => void };
+type Props = {
+  session: Session;
+  sessionRefresh: number;
+  onSignOut: () => void;
+  onSessionChanged: (session: Session) => void;
+};
 type Destination = "findings" | "settings" | "signout";
 const emptyDraft: FindingDraft = { project: "", title: "", description: "" };
 
-export function Shell({ session, onSignOut }: Props) {
-  const [view, setView] = useState<"findings" | "report" | "settings">(
-    "findings",
+export function Shell({
+  session: currentSession,
+  sessionRefresh,
+  onSignOut,
+  onSessionChanged: notifySessionChanged,
+}: Props) {
+  const session = useMemo(
+    () => currentSession,
+    [
+      currentSession.user.id,
+      currentSession.user.email,
+      currentSession.csrfToken,
+    ],
   );
+  const onSessionChanged = useCallback(() => notifySessionChanged(session), [notifySessionChanged, session]);
+  const [callbackResult] = useState(() => {
+    const url = new URL(window.location.href);
+    const result = url.searchParams.get("jira");
+    if (result) {
+      url.searchParams.delete("jira");
+      window.history.replaceState(
+        null,
+        "",
+        url.pathname + url.search + url.hash,
+      );
+    }
+    return result;
+  });
+  const [view, setView] = useState<"findings" | "report" | "settings">(
+    callbackResult ? "settings" : "findings",
+  );
+  const [jira, setJira] = useState<JiraStatus | null>(null);
+  const [jiraError, setJiraError] = useState("");
+  const [projects, setProjects] = useState<JiraProject[]>([]);
+  const [project, setProject] = useState("");
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectError, setProjectError] = useState("");
+  const [projectRetry, setProjectRetry] = useState(0);
+  const statusVersion = useRef(0);
+  const refreshJira = useCallback(async () => {
+    const version = ++statusVersion.current;
+    try {
+      const result = await jiraRequest<JiraStatus>(session, "/api/jira/status");
+      if (version === statusVersion.current) {
+        setJira(result);
+        setJiraError("");
+      }
+    } catch (error) {
+      if (version !== statusVersion.current) return;
+      if (error instanceof SessionChanged) onSessionChanged();
+      else {
+        setJiraError("Could not load Jira connection. Please try again.");
+        setJira(null);
+      }
+      throw error;
+    }
+  }, [session, onSessionChanged]);
+  useEffect(() => {
+    void refreshJira().catch(() => {});
+    return () => {
+      ++statusVersion.current;
+    };
+  }, [refreshJira, sessionRefresh]);
+  useEffect(() => {
+    let active = true;
+    setProjects([]);
+    setProject("");
+    setProjectError("");
+    if (!jira?.site)
+      return () => {
+        active = false;
+      };
+    setProjectsLoading(true);
+    jiraRequest<{ projects: JiraProject[] }>(session, "/api/jira/projects")
+      .then((result) => {
+        if (active) {
+          setProjects(result.projects);
+          setProjectError("");
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          if (error instanceof SessionChanged) onSessionChanged();
+          else
+            setProjectError(
+              "Could not load projects. Check access or reconnect Jira.",
+            );
+        }
+      })
+      .finally(() => {
+        if (active) setProjectsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [jira?.site?.id, session, onSessionChanged, projectRetry]);
   const [draft, setDraft] = useState<FindingDraft>(emptyDraft);
   const [pending, setPending] = useState<Destination | null>(null);
   const [focusFindings, setFocusFindings] = useState(false);
@@ -123,7 +226,18 @@ export function Shell({ session, onSignOut }: Props) {
           onBack={() => leave("findings")}
         />
       ) : view === "settings" ? (
-        <Settings email={session.user.email} />
+        <Settings
+          session={session}
+          status={jira}
+          statusError={jiraError}
+          refresh={refreshJira}
+          onSessionChanged={onSessionChanged}
+          callbackNotice={
+            callbackResult === "failed"
+              ? "Jira authorization was not completed. Try connecting again."
+              : ""
+          }
+        />
       ) : (
         <main id="content" className="wrap workspace">
           <div className="findings-heading">
@@ -139,6 +253,7 @@ export function Shell({ session, onSignOut }: Props) {
               className="primary-button"
               onClick={() => {
                 setFocusFindings(false);
+                if (project) setDraft((current) => ({ ...current, project }));
                 setView("report");
               }}
             >
@@ -146,9 +261,43 @@ export function Shell({ session, onSignOut }: Props) {
             </button>
           </div>
           <div className="project-toolbar">
-            <span>Project selection unavailable</span>
-            <span>Jira integration is not available yet</span>
+            {!jira ? (
+              <span>{jiraError || "Loading Jira connection…"}</span>
+            ) : !jira.connected || !jira.site ? (
+              <span>Connect Jira and select a site in Settings.</span>
+            ) : projectsLoading ? (
+              <span>Loading projects…</span>
+            ) : projectError ? (
+              <div>
+                <p role="alert">{projectError}</p>
+                <button
+                  className="text-button"
+                  onClick={() => setProjectRetry((value) => value + 1)}
+                >
+                  Retry projects
+                </button>
+              </div>
+            ) : projects.length ? (
+              <label>
+                Jira project{" "}
+                <select
+                  value={project}
+                  onChange={(event) => setProject(event.target.value)}
+                >
+                  <option value="">Choose a project</option>
+                  {projects.map((item) => (
+                    <option value={item.key} key={item.id}>
+                      {item.name} ({item.key})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <span>No projects available. Check your Jira access.</span>
+            )}
+            {jira?.site && <span>{jira.site.name}</span>}
           </div>
+          {jiraError && jira && <p role="alert">{jiraError}</p>}
           <section aria-labelledby="recent-heading">
             <div className="section-heading">
               <h2 id="recent-heading">Recent tickets</h2>
@@ -158,10 +307,9 @@ export function Shell({ session, onSignOut }: Props) {
               Tickets created by this app, not your entire Jira history.
             </p>
             <div className="ledger-empty">
-              <h3>Ticket history is unavailable</h3>
+              <h3>Ticket history is not available yet</h3>
               <p>
-                Connect Jira when integration becomes available to view tickets
-                here.
+                Ticket creation and history will be connected in the next phase.
               </p>
               <button className="text-button" onClick={() => setView("report")}>
                 Prepare a local draft

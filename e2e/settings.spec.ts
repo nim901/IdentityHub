@@ -13,7 +13,7 @@ test("settings tabs provide honest unavailable states and keyboard navigation", 
   await expect(page.getByRole("heading", { name: "Settings" })).toBeFocused();
   await expect(
     page.getByRole("button", { name: "Connect Jira" }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   const jiraTab = page.getByRole("tab", { name: "Jira connection" });
   await jiraTab.focus();
   await page.keyboard.press("ArrowRight");

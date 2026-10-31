@@ -17,7 +17,7 @@
 - Protect sessions with appropriate cookie flags, expiry, logout invalidation, and CSRF checks. Validate and bound inputs, enforce authorization, use safe error messages, and keep secrets out of responses, logs, tests, and fixtures.
 - Store credentials only in ignored local configuration or an appropriate secret store; never commit credentials, keys, databases, or real tokens. Keep example configuration free of secrets.
 - Check current provider documentation before implementing provider-specific endpoints, scopes, request shapes, or models, and cite the relevant documentation in code. Stop if the required information cannot be verified.
-- Do not run real OAuth, create provider accounts, send live provider writes, or contact live Atlassian, Oasis, or AI endpoints. Live verification is performed manually by the owner with their credentials.
+- Automated tests must never use real OAuth or credentials, or contact live Atlassian, Oasis, or AI endpoints. Live OAuth is available outside tests when configured; live verification is performed manually with the owner's credentials. Do not create provider accounts, create Jira issues, or modify other provider content.
 
 ## Verification
 

@@ -39,6 +39,7 @@ describe('Jira token exchange', () => {
     const { a } = await createTwoUsers(app);
     const result = await app.inject({ method: 'POST', url: '/api/jira/connect', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken } });
     expect(result.statusCode).toBe(503);
+    expect((await app.inject({ url: '/api/jira/status', headers: { cookie: a.cookie } })).json()).toEqual({ configured: false, connected: false, site: null });
     expect(called).toBe(false);
   }, 30000);
   it('fails closed instead of ignoring a configured fake authorization base', async () => {
@@ -74,12 +75,12 @@ describe('Jira token exchange', () => {
     const redirect = await fake.inject({ url: authorization.pathname + authorization.search });
     const url = new URL(redirect.headers.location!);
     const pathAndQuery = url.pathname + url.search;
-    expect((await app.inject({ url: pathAndQuery, headers: { cookie: b.cookie } })).statusCode).toBe(400);
+    expect((await app.inject({ url: pathAndQuery, headers: { cookie: b.cookie } })).headers.location).toBe('/?jira=failed');
     const result = await app.inject({ url: pathAndQuery, headers: { cookie: a.cookie } });
-    expect(result.statusCode).toBe(200);
+    expect(result.statusCode).toBe(303);
     expect(result.body).not.toContain('fake-access-token');
     expect(result.body).not.toContain('fake-refresh-token');
-    expect((await app.inject({ url: pathAndQuery, headers: { cookie: a.cookie } })).statusCode).toBe(400);
+    expect((await app.inject({ url: pathAndQuery, headers: { cookie: a.cookie } })).headers.location).toBe('/?jira=failed');
     expect(requests).toBe(1);
     const db = new Database(path, { readonly: true });
     try {
@@ -93,12 +94,12 @@ describe('Jira token exchange', () => {
       rejectExchange = true;
       const retry = await app.inject({ method: 'POST', url: '/api/jira/connect', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken } });
       const retryState = new URL(retry.json().authorizationUrl).searchParams.get('state');
-      expect((await app.inject({ url: `/api/jira/callback?code=fake-code&state=${retryState}`, headers: { cookie: a.cookie } })).statusCode).toBe(502);
+      expect((await app.inject({ url: `/api/jira/callback?code=fake-code&state=${retryState}`, headers: { cookie: a.cookie } })).statusCode).toBe(303);
       expect(db.prepare('SELECT user_id, access_token_enc, refresh_token_enc FROM jira_credentials').all()).toEqual(rows);
       rejectExchange = false;
       const bStart = await app.inject({ method: 'POST', url: '/api/jira/connect', headers: { cookie: b.cookie, 'x-csrf-token': b.csrfToken } });
       const bState = new URL(bStart.json().authorizationUrl).searchParams.get('state');
-      expect((await app.inject({ url: `/api/jira/callback?code=fake-code&state=${bState}`, headers: { cookie: b.cookie } })).statusCode).toBe(200);
+      expect((await app.inject({ url: `/api/jira/callback?code=fake-code&state=${bState}`, headers: { cookie: b.cookie } })).statusCode).toBe(303);
       const bId = (await app.inject({ url: '/api/auth/session', headers: { cookie: b.cookie } })).json().user.id;
       const bRow = db.prepare('SELECT access_token_enc FROM jira_credentials WHERE user_id = ?').get(bId) as { access_token_enc: string };
       expect(decryptToken(parseEncryptionKey(key), bId, 'access', bRow.access_token_enc)).toBe('fake-access-token');
@@ -124,10 +125,10 @@ describe('Jira token exchange', () => {
       const state = authorization.searchParams.get('state');
       const url = `/api/jira/callback?code=fake-code&state=${state}`;
       const result = await app.inject({ url, headers: { cookie: a.cookie } });
-      expect(result.statusCode).toBe(502);
+      expect(result.statusCode).toBe(303);
       expect(result.body).not.toContain('private-upstream-detail');
       expect(result.body).not.toContain('fake-access-token');
-      expect((await app.inject({ url, headers: { cookie: a.cookie } })).statusCode).toBe(400);
+      expect((await app.inject({ url, headers: { cookie: a.cookie } })).headers.location).toBe('/?jira=failed');
     }
     expect(logs).not.toContain('private-upstream-detail');
     expect(logs).not.toContain('fake-access-token');
@@ -151,10 +152,10 @@ describe('Jira token exchange', () => {
     const secondCookie = sessionCookie(secondLogin.headers['set-cookie']);
     const secondStart = await app.inject({ method: 'POST', url: '/api/jira/connect', headers: { cookie: secondCookie, 'x-csrf-token': secondLogin.json().csrfToken } });
     const secondState = new URL(secondStart.json().authorizationUrl).searchParams.get('state');
-    expect((await app.inject({ url: `/api/jira/callback?code=fake-code&state=${secondState}`, headers: { cookie: secondCookie } })).statusCode).toBe(502);
+    expect((await app.inject({ url: `/api/jira/callback?code=fake-code&state=${secondState}`, headers: { cookie: secondCookie } })).statusCode).toBe(303);
     expect((await app.inject({ method: 'POST', url: '/api/auth/logout', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken } })).statusCode).toBe(204);
     release();
-    expect((await pending).statusCode).toBe(401);
+    expect((await pending).headers.location).toBe('/?jira=expired');
     const db = new Database(path, { readonly: true });
     try { expect(db.prepare('SELECT COUNT(*) AS count FROM jira_credentials').get()).toEqual({ count: 0 }); } finally { db.close(); }
   }, 30000);
@@ -165,6 +166,6 @@ describe('Jira token exchange', () => {
     const start = await app.inject({ method: 'POST', url: '/api/jira/connect', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken } });
     const state = new URL(start.json().authorizationUrl).searchParams.get('state');
     const result = await app.inject({ url: `/api/jira/callback?code=fake-code&state=${state}`, headers: { cookie: a.cookie } });
-    expect(result.statusCode).toBe(502);
+    expect(result.statusCode).toBe(303);
   }, 30000);
 });

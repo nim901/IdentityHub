@@ -15,6 +15,13 @@ export type JiraSite = { id: string; name: string; url: string };
 export class JiraConnection {
   constructor(private readonly db: Database.Database, private readonly oauth: JiraOAuth) {}
 
+  status(userId: string) {
+    const credential = this.db.prepare("SELECT refresh_status FROM jira_credentials WHERE user_id = ?").get(userId) as { refresh_status: string } | undefined;
+    const selected = this.db.prepare('SELECT cloud_id, site_name, site_url FROM jira_sites WHERE user_id = ?').get(userId) as { cloud_id: string; site_name: string; site_url: string } | undefined;
+    const connected = credential?.refresh_status === 'ready';
+    return { configured: true, connected, site: connected && selected ? { id: selected.cloud_id, name: selected.site_name, url: selected.site_url } : null };
+  }
+
   // Accessible resources and gateway URLs: https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/
   async sites(userId: string): Promise<JiraSite[]> {
     const { sites } = await this.resources(userId);

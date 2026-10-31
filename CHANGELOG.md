@@ -2,7 +2,20 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 4A — Finding creation backend (in review for main; previously merged in PR #13)
+## Phase 4B.1 - Jira connection and project selection (in review)
+
+- Corrected the unconfigured Jira message so it does not imply an administrator role.
+- Added a visible disabled Jira connection button and setup guidance, and made failed project discovery explicitly retryable without silently clearing its error.
+- Strengthened the failed OAuth browser test to verify the fake token endpoint was actually called, using a marker in its isolated temporary test directory.
+- Enabled configured live OAuth outside automated tests; the local preview now reads the existing `.env` without altering it. The owner completed a live OAuth callback and saved a Jira site; live project discovery and ticket creation remain unverified.
+- Added browser-to-API coverage for missing Jira configuration, an invalid encryption key, and a rejected fake OAuth token exchange. Test servers clear inherited Jira settings and use isolated temporary databases.
+- Connected Jira settings, OAuth return, site selection, and project discovery to the session-authenticated API. The finding form and ticket history remain unavailable in the UI.
+- Review fixes bind browser Jira reads to the expected session, ignore late failures from an older session, and refresh connection state when a tab regains focus.
+- Added user-scoped connection status and fake-provider browser coverage for connection, selection, access errors, empty projects, account switching, and mobile layout. Provider credentials stay server-side.
+- Host checks: 31 server tests, lint, the build, and all 19 browser tests passed in the latest review. An earlier browser run timed out starting its test server while multiple commands ran concurrently; a subsequent run passed. Browser tests used temporary databases and fakes. Docker configuration was inspected; container checks could not run because Docker is unavailable. Live project discovery and ticket creation remain unverified.
+- The production dependency audit reported three moderate findings in the existing `@fastify/static`, `glob`, and `minimatch` chain; dependency remediation remains separate.
+
+## Phase 4A - Finding creation backend (merged, PR #14)
 
 - Added session-authenticated finding creation, project permission and issue metadata checks, user-scoped recent history, a bounded per-site queue, and idempotency records. Requests require the Jira write grant and a unique idempotency key.
 - Review fixed an SDK metadata mismatch with Atlassian's documented response and checks current resource write scopes even when the token response omits `scope`. Consumed metadata is validated before use. Uncertain outcomes remain blocked for manual review.

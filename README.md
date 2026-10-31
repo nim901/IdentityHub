@@ -1,6 +1,6 @@
 # IdentityHub
 
-IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth, encrypted rotating credentials, site selection, and project discovery. Jira UI integration, ticket creation, API keys, and the AI digest are not implemented. Jira has not been live-verified.
+IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth, encrypted rotating credentials, site and project discovery, and a session-authenticated finding-to-Jira API. The Jira UI, external API keys, and AI digest are not implemented. Provider behavior has not been live-verified.
 
 ## Requirements
 
@@ -95,8 +95,10 @@ Server tests use an in-memory SQLite database and run one test file at a time, w
 | `POST /api/auth/logout` | Sign out; include the `X-CSRF-Token` header. |
 | `POST /api/jira/connect` | Start an authenticated, CSRF-protected OAuth request and return its authorization URL. |
 | `GET /api/jira/callback` | Validate state, exchange the code, and store encrypted credentials for the initiating user. |
-| `GET /api/jira/sites`, `POST /api/jira/site` | List accessible sites and select one using JSON `id`. |
-| `GET /api/jira/projects` | List projects for the selected site. |
+| `GET /api/jira/sites`, `POST /api/jira/site` | List accessible Jira sites and select one (JSON `id`). |
+| `GET /api/jira/projects` | List projects in the selected site. |
+| `POST /api/findings` | Create a ticket from `project`, `title`, and `description`; requires a unique 16–128 character `Idempotency-Key` and CSRF token. |
+| `GET /api/findings?project=KEY` | Return up to ten of the signed-in user's locally recorded tickets. |
 
 Session-authenticated state-changing requests require the CSRF token. Sessions expire after 24 hours. Login and registration are rate-limited in memory; those limits reset on restart and are not shared across multiple instances. Duplicate registration reports that an email is already registered, which improves feedback but reveals whether an account exists. Login errors remain generic.
 
@@ -122,7 +124,7 @@ The start endpoint requires `ATLASSIAN_CLIENT_ID`, `ATLASSIAN_CLIENT_SECRET`, `O
 
 The SDK uses Atlassian's fixed authorization and token hosts. `ATLASSIAN_AUTH_BASE` and `ATLASSIAN_AUTH_BROWSER_BASE`, if set, must both be `https://auth.atlassian.com`; other values disable the flow with 503 rather than silently contacting Atlassian. In particular, `.env.mock` is not a runnable integration configuration. Tests route to the fake with an injected transport, not these environment variables.
 
-The start endpoint requests `read:jira-work` and `offline_access` and creates single-use state valid for ten minutes. A successful callback exchanges the code and stores tokens encrypted using AES-256-GCM, bound to the authenticated user. It does not return tokens. A failed exchange consumes the state and requires a new attempt. Only one token exchange per user can run at a time in this single-instance app. Refresh rotation and project discovery are implemented; UI integration and owner-run live verification remain outstanding. Request logs omit query strings to avoid recording callback codes and state. Atlassian documents [the exchange and offline scope](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/).
+The start endpoint requests `read:jira-work`, `write:jira-work` and `offline_access` and creates single-use state valid for ten minutes. A successful callback exchanges the code and stores tokens encrypted using AES-256-GCM, bound to the authenticated user. It does not return tokens. A failed exchange consumes the state and requires a new attempt. Only one token exchange per user can run at a time in this single-instance app. Refresh rotation and project discovery are implemented; the UI is not connected. Existing grants without the write scope must reconnect. Do not perform live OAuth until owner-run verification. Request logs omit query strings to avoid recording callback codes and state. Atlassian documents [the exchange and offline scope](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/).
 
 ## Project structure and next steps
 
@@ -130,11 +132,11 @@ The start endpoint requests `read:jira-work` and `offline_access` and creates si
 - `server/src/routes/` handles HTTP and CSRF checks; `server/src/services/` contains authentication logic; `server/src/db/` contains the SQLite connection and authentication repository; `server/migrations/` defines the database schema.
 - [Build plan](docs/BUILD_PLAN.md), [system design](docs/SYSTEM_DESIGN.md), and [trade-offs](docs/tradeoffs.md) describe the planned work and decisions. [Changelog](CHANGELOG.md) records completed phases.
 
-Next phases add the finding API and recent history, Jira UI integration, API keys and the external API, and the AI digest. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
+Next phases connect the findings and Jira UI, add API keys and the external API, and implement the AI digest. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
 
 ## UI foundation
 
-The signed-in interface includes a responsive account shell and an accessible account menu. Jira connection and ticket features remain unavailable. The Radix Dropdown Menu dependency provides the account menu's keyboard and focus behavior; the interface uses custom CSS. The [build plan](docs/BUILD_PLAN.md) groups the UI and backend review as phase 2 and plans Jira connection for phase 3.
+The signed-in interface includes a responsive account shell and an accessible account menu. The Jira connection and ticket features are not yet connected to the UI. The Radix Dropdown Menu dependency provides the account menu's keyboard and focus behavior; the interface uses custom CSS. The [build plan](docs/BUILD_PLAN.md) groups the UI and backend review as phase 2 and plans Jira connection for phase 3.
 
 The Findings view shows an unavailable ledger until the UI is connected to the backend. The reporting view holds a temporary draft in memory only; it cannot create a ticket. Leaving with a nonempty draft prompts for confirmation. Browsers control the reload or tab-close warning and may suppress it, especially on mobile. Drafts are lost on reload or process termination. Views do not create browser history entries or support deep links.
 
@@ -142,6 +144,10 @@ Settings contains planned Jira connection and API access panels; those services 
 
 The project-local Fastify reference and the current authentication review are described in [the backend review](docs/BACKEND_REVIEW.md). Its third-party examples are guidance, subject to this project's security and design decisions.
 
-## Jira connection limitations
+## Jira backend limitations
 
-This is a single-instance application. Refreshes are coordinated per user within the process; before a refresh, the database marks the old token in use. A failed or interrupted rotation requires reconnecting rather than reusing a possibly invalidated token. The selected site must be an accessible `*.atlassian.net` HTTPS site. Provider requests are bounded, timed out, and reject redirects. An otherwise unexpired access token rejected by Jira requires reconnecting. Tests use fake transports and cannot establish real Jira compatibility.
+The application is designed for one server instance. Refreshes for one user share a single in-process operation. Before sending a refresh, the database marks the old token as in use; an interrupted or failed refresh requires reconnecting instead of reusing a possibly rotated token. Requests do not automatically retry Jira writes. A pending or unknown ticket operation requires checking Jira before any new attempt: a different key can create a duplicate. These records are not automatically reconciled.
+
+The selected site must be an accessible `*.atlassian.net` HTTPS site. Project and create-field metadata are checked before ticket creation; projects requiring unsupported mandatory fields cannot be used. `JIRA_DEFAULT_ISSUE_TYPE` optionally prefers a supported issue type by name; otherwise a supported Task is preferred. The recent list is local app-created history, not a live Jira query, and uses the local recorded creation time. Configured grants need Jira's create permission and the write scope. An expired token is refreshed before use; a provider 401 for an otherwise unexpired token currently requires reconnecting.
+
+Provider responses are bounded, timed out and restricted to fixed Atlassian endpoints with redirects rejected. The bounded queue limits concurrent creates, but there is no per-user creation rate limit yet. Automated tests inject a fake transport; they do not establish real Jira compatibility. The standalone fake remains limited to the earlier OAuth groundwork and cannot exercise projects or ticket creation.

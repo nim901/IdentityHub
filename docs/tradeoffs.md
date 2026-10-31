@@ -43,6 +43,8 @@ The SDK awaits `onTokenRefresh`, but updates its in-memory tokens before that ca
 
 The SDK reduces handwritten API and OAuth code but adds a dependency and behavior to understand. Keep it behind the Jira boundary. Live Jira compatibility remains unverified.
 
+The SDK's strict create-field schema requires a `schema` field that Atlassian's documented response example omits. The client suppresses SDK schema-mismatch reporting and validates the project, issue-type, field, and created-issue data it uses itself; this avoids logging provider data and rejecting that documented shape. The selected site's current accessible-resource scopes determine whether the grant permits writes, since a token response may omit `scope`.
+
 **Potential benefit:** Typed operations and maintained API models could reduce handwritten request code. **Cost and risk:** an additional dependency and behavior that must be understood, including retries and refresh handling. Automatic retry of issue creation must not cause duplicates after an uncertain result.
 
 Regardless of client, verify fake-server behavior, safe errors, token rotation persisted before reuse, and concurrent refresh across requests for a user. Retain the bounded per-site queue, authorization, isolation, and idempotency rules behind the Jira boundary.
@@ -51,7 +53,7 @@ Regardless of client, verify fake-server behavior, safe errors, token rotation p
 
 OAuth avoids asking users for personal Jira API tokens, but adds app registration, callback handling, state validation, encrypted token storage, and rotating refresh-token complexity. A simpler token-based integration would reduce setup but is less suitable for a multi-user connection flow. The recent list uses our own user-scoped ticket records because labels do not establish user ownership; the trade-off is that external Jira changes are not synchronized.
 
-The callback consumes state before code exchange, so an upstream or storage failure requires a new authorization. Only one outstanding request per session is kept, so a later start invalidates the earlier one. A new flow removes that user's expired states, and session deletion cascades to pending states. Tokens are encrypted with AES-256-GCM using a stable externally configured key and user/type-bound authenticated data. Losing or changing that key makes stored tokens unreadable; key rotation is future work. Refresh rotation is coordinated per user in one process; a failed or interrupted rotation requires reconnection. Overlapping exchanges for one user are rejected within this single-instance app; this is not a cross-process lock.
+The callback consumes state before code exchange, so an upstream or storage failure requires a new authorization. Only one outstanding request per session is kept, so a later start invalidates the earlier one. A new flow removes that user's expired states, and session deletion cascades to pending states. Tokens are encrypted with AES-256-GCM using a stable externally configured key and user/type-bound authenticated data. Losing or changing that key makes stored tokens unreadable; key rotation remains future work; refresh rotation is coordinated per user in one process and a failed or interrupted rotation requires reconnection. Overlapping exchanges for one user are rejected within this single-instance app; this is not a cross-process lock.
 
 ## AI digest and uncertain outcomes
 
@@ -88,3 +90,7 @@ Radix Tabs supplies keyboard navigation for the Jira and scanner settings panels
 ## Jira site discovery
 
 The user selects one accessible Jira Cloud site; each project query checks current resource access. Site URLs are restricted to HTTPS `*.atlassian.net` hosts. Custom domains and multiple server processes are not supported. Live provider behavior remains unverified.
+
+## Jira create metadata and duplicate prevention
+
+We inspect Jira's project and issue-type create metadata before writing and select a supported non-subtask type, preferring the optional configured name and then Task. This deliberately rejects configurations with unsupported required fields rather than guessing. A bounded in-memory per-site queue and a user-scoped idempotency reservation reduce duplicate creation; they do not provide distributed coordination or exactly-once delivery. Unknown outcomes require manual investigation, and the caller must not use a new key without checking Jira. The local recent list is user-isolated but does not reflect external edits. Sites with custom domains are not supported. Live behavior and permissions still need owner verification.

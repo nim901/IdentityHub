@@ -8,7 +8,7 @@ Use TypeScript in strict mode, React and Vite for the web interface, Fastify for
 
 ## Planned interfaces
 
-The browser calls only our API. Session-authenticated writes require a CSRF token. Health, authentication, Jira OAuth, site selection and project discovery are implemented. Finding creation, UI integration, API keys, and the digest remain planned.
+The browser calls only our API. Session-authenticated writes require a CSRF token. Health, authentication, Jira OAuth, site and project discovery, and session-authenticated finding creation and history are implemented. UI integration, API keys, and digest interfaces remain planned.
 
 | Interface | Purpose |
 | --- | --- |
@@ -18,7 +18,7 @@ The browser calls only our API. Session-authenticated writes require a CSRF toke
 | `GET /api/jira/callback` | Validate OAuth state, exchange the code, and store the connection. |
 | `GET /api/jira/sites`, `POST /api/jira/site` | List and select an accessible Jira site. |
 | `GET /api/jira/projects` | List projects available to the connected user. |
-| Finding form route | Validate and create a ticket for the signed-in user. |
+| `POST /api/findings` | Validate and create a ticket for the signed-in user. |
 | `GET /api/findings?project=KEY` | Return this user's ten most recent app-created tickets for the selected project. |
 | API key management routes | Create, list, and revoke the user's keys and restrict each key to allowed projects. |
 | `POST /api/v1/findings` | Create a finding using `X-API-Key` and an optional `Idempotency-Key`. |
@@ -58,7 +58,7 @@ Add the responsive workspace shell, local finding drafts, settings, and session 
 
 ### 3. Jira connection
 
-Groundwork: the standalone local fake models authorization, code exchange, and accessible resources. The app starts OAuth, validates session-bound state, exchanges the code, and stores user-scoped encrypted tokens. Tests use fakes without provider calls. Refresh rotation, per-user coordination, site selection, and project discovery are implemented; Jira UI and live-provider verification remain outstanding.
+Groundwork: the standalone local fake models authorization, code exchange, and accessible resources. The app starts OAuth, validates session-bound state, exchanges the code, and stores user-scoped encrypted tokens. Tests use fakes without provider calls. Refresh rotation, user coordination, site selection, and project discovery are implemented in the backend; owner-run live verification and UI integration remain outstanding.
 
 Recheck current Atlassian documentation; implement a fake service, OAuth connection, encrypted token storage, refresh rotation with a per-user lock, and project discovery.
 
@@ -66,9 +66,9 @@ Recheck current Atlassian documentation; implement a fake service, OAuth connect
 
 ### 4A. Findings backend and recent tickets
 
-Implement the shared finding service, project authorization, Jira issue creation, and recent-ticket API. Choose a supported non-subtask issue type using the configured default where available.
+The session-authenticated finding service, project authorization, Jira issue creation, and local recent-ticket API are implemented. Implement the form and recent-list UI later. Choose a supported non-subtask issue type using the configured default where available.
 
-**Done when:** tests cover validation, project permissions, safe Jira errors, text-only document content, stored-site links, per-site serialization, and user/project-scoped recent results ordered newest first and limited to ten. Links are constructed from the selected trusted site.
+**Done when:** tests cover validation, project permissions, safe Jira errors, text-only document content, stored-site links, per-site serialization, and user/project-scoped recent results ordered newest first and limited to ten.
 
 ### 4B. Jira connection and findings UI
 

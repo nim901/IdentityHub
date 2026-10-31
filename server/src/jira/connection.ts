@@ -61,10 +61,13 @@ export class JiraConnection {
     const fetch = createGuardedFetch({ fetch: this.oauth.transport() }, (url, method) => {
       if (url.origin !== 'https://api.atlassian.com' || url.username || url.password || url.hash || url.search.length > 2048) return false;
       if (method === 'GET' && url.pathname === `${prefix}/project/search`) return true;
-      return false;
+      if (method === 'GET' && new RegExp(`^${prefix}/issue/createmeta/[A-Z][A-Z0-9_]{0,31}/issuetypes(?:/[0-9]{1,32})?$`).test(url.pathname)) return true;
+      return method === 'POST' && url.pathname === `${prefix}/issue` && !url.search;
     }, 1048576);
+    // Atlassian's create-field example omits `schema`, which jira.js 6.3.0 requires.
+    // Validate the response fields used by this app ourselves: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-createmeta-projectidorkey-issuetypes-issuetypeid-get
     const client = createCloudClient({ host: base, auth: { type: 'bearer', token }, fetch, onSchemaMismatch: 'silent' });
-    return { client, site: selected, credentialVersion };
+    return { client, site: selected, credentialVersion, canWrite: resource.scopes.includes('write:jira-work') };
   }
 
   async projects(userId: string) {

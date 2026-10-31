@@ -51,7 +51,7 @@ Regardless of client, verify fake-server behavior, safe errors, token rotation p
 
 OAuth avoids asking users for personal Jira API tokens, but adds app registration, callback handling, state validation, encrypted token storage, and rotating refresh-token complexity. A simpler token-based integration would reduce setup but is less suitable for a multi-user connection flow. The recent list uses our own user-scoped ticket records because labels do not establish user ownership; the trade-off is that external Jira changes are not synchronized.
 
-The callback consumes state before code exchange, so an upstream or storage failure requires a new authorization. Only one outstanding request per session is kept, so a later start invalidates the earlier one. A new flow removes that user's expired states, and session deletion cascades to pending states. Tokens are encrypted with AES-256-GCM using a stable externally configured key and user/type-bound authenticated data. Losing or changing that key makes stored tokens unreadable; key rotation and refresh coordination are future work. Overlapping exchanges for one user are rejected within this single-instance app; this is not a cross-process lock.
+The callback consumes state before code exchange, so an upstream or storage failure requires a new authorization. Only one outstanding request per session is kept, so a later start invalidates the earlier one. A new flow removes that user's expired states, and session deletion cascades to pending states. Tokens are encrypted with AES-256-GCM using a stable externally configured key and user/type-bound authenticated data. Losing or changing that key makes stored tokens unreadable; key rotation is future work. Refresh rotation is coordinated per user in one process; a failed or interrupted rotation requires reconnection. Overlapping exchanges for one user are rejected within this single-instance app; this is not a cross-process lock.
 
 ## AI digest and uncertain outcomes
 
@@ -84,3 +84,7 @@ The draft is kept in memory so it is not retained in browser storage. It is lost
 ## Settings tabs
 
 Radix Tabs supplies keyboard navigation for the Jira and scanner settings panels. The panels describe unavailable services and do not simulate connections or keys.
+
+## Jira site discovery
+
+The user selects one accessible Jira Cloud site; each project query checks current resource access. Site URLs are restricted to HTTPS `*.atlassian.net` hosts. Custom domains and multiple server processes are not supported. Live provider behavior remains unverified.

@@ -13,6 +13,7 @@ import { authRoutes } from "./routes/auth.js";
 import { csrfGuard } from "./routes/csrf.js";
 import { JiraOAuth, type JiraOAuthConfig } from "./jira/oauth.js";
 import { jiraRoutes } from "./routes/jira.js";
+import { JiraConnection } from "./jira/connection.js";
 
 export async function buildApp(
   options: {
@@ -71,9 +72,8 @@ export async function buildApp(
   if (oauthConfig) {
     try { oauth = new JiraOAuth(db, oauthConfig); } catch { /* Invalid configuration disables the connection. */ }
   }
-  await app.register(async (instance) =>
-    jiraRoutes(instance, auth, oauth),
-  );
+  const connection = oauth ? new JiraConnection(db, oauth) : undefined;
+  await app.register(async (instance) => jiraRoutes(instance, auth, oauth, connection));
   app.get("/healthz", async () => ({ status: "ok" }));
   const webRoot = resolve(
     fileURLToPath(new URL("../../web/dist", import.meta.url)),

@@ -2,7 +2,12 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 3 — Token exchange and encrypted storage (in review)
+## Phase 3 — Jira refresh and project discovery (in review)
+
+- Added user-coordinated rotating refresh tokens, accessible-site selection, and project discovery. Failed or interrupted rotations require reconnection.
+- The connection snapshot passed 29 host and Docker tests, including the site-change race test, plus lint and a Docker build. A network-isolated production container started healthy with five migrations on a fresh database. Tests used fake providers; Jira UI, finding creation, and live provider checks remain outstanding.
+
+## Phase 3 — Token exchange and encrypted storage (merged in PR #11)
 
 - Exchange single-use OAuth codes using `jira.js`, request offline access, and store per-user access and refresh tokens encrypted with AES-256-GCM. Exchange errors are sanitized; no real provider checks have been performed. Refresh and project discovery remain unimplemented.
 - All 24 host and Docker tests passed; host lint and build, dependency audit, Docker runtime build, and fresh-database migration and health checks passed. Tests cover invalid configuration, user isolation, authenticated encryption, replay, logout during exchange, upstream errors, redirects, oversized responses, and a stalled exchange. Browser and real-provider checks remain unverified.

@@ -3,6 +3,7 @@ import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { FindingComposer, type FindingDraft } from "./FindingComposer";
 import { Settings } from "./Settings";
+import { createFinding, CreatedNotRecorded, RejectedFinding, safeTicketUrl, type Ticket } from "./findingApi";
 import type { Session } from "./authApi";
 import {
   jiraRequest,
@@ -59,6 +60,7 @@ export function Shell({
   const [projectError, setProjectError] = useState("");
   const [projectRetry, setProjectRetry] = useState(0);
   const statusVersion = useRef(0);
+  const [confirmedSessionRefresh, setConfirmedSessionRefresh] = useState(sessionRefresh);
   const refreshJira = useCallback(async () => {
     const version = ++statusVersion.current;
     try {
@@ -66,6 +68,7 @@ export function Shell({
       if (version === statusVersion.current) {
         setJira(result);
         setJiraError("");
+        setConfirmedSessionRefresh(sessionRefresh);
       }
     } catch (error) {
       if (version !== statusVersion.current) return;
@@ -76,13 +79,13 @@ export function Shell({
       }
       throw error;
     }
-  }, [session, onSessionChanged]);
+  }, [session, onSessionChanged, sessionRefresh]);
   useEffect(() => {
     void refreshJira().catch(() => {});
     return () => {
       ++statusVersion.current;
     };
-  }, [refreshJira, sessionRefresh]);
+  }, [refreshJira]);
   useEffect(() => {
     let active = true;
     setProjects([]);
@@ -116,6 +119,39 @@ export function Shell({
       active = false;
     };
   }, [jira?.site?.id, session, onSessionChanged, projectRetry]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketContext, setTicketContext] = useState("");
+  const currentTicketContext = `${jira?.site?.id ?? ""}:${project}`;
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [ticketsError, setTicketsError] = useState("");
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const submissionLock = useRef(false);
+  const [submitError, setSubmitError] = useState("");
+  const [uncertain, setUncertain] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [createdMessage, setCreatedMessage] = useState("");
+  useEffect(() => {
+    let active = true;
+    setTickets([]);
+    setTicketContext(currentTicketContext);
+    setTicketsError("");
+    if (!project || !jira?.site) { setTicketsLoading(false); return () => { active = false; }; }
+    if (confirmedSessionRefresh !== sessionRefresh) {
+      setTicketsLoading(true);
+      return () => { active = false; };
+    }
+    setTicketsLoading(true);
+    jiraRequest<{ findings: Ticket[] }>(session, `/api/findings?project=${encodeURIComponent(project)}&siteId=${encodeURIComponent(jira.site.id)}`)
+      .then(result => { if (active) setTickets(result.findings); })
+      .catch(error => {
+        if (!active) return;
+        if (error instanceof SessionChanged) onSessionChanged();
+        else setTicketsError("Could not load recent tickets. Try again.");
+      })
+      .finally(() => { if (active) setTicketsLoading(false); });
+    return () => { active = false; };
+  }, [project, jira?.site?.id, session, onSessionChanged, historyVersion, sessionRefresh, confirmedSessionRefresh]);
   const [draft, setDraft] = useState<FindingDraft>(emptyDraft);
   const [pending, setPending] = useState<Destination | null>(null);
   const [focusFindings, setFocusFindings] = useState(false);
@@ -139,7 +175,36 @@ export function Shell({
     if (view === "findings" && focusFindings) heading.current?.focus();
   }, [view, focusFindings]);
 
+  async function submitFinding() {
+    if (submissionLock.current || confirmedSessionRefresh !== sessionRefresh || !project || draft.project !== project || !jira?.site || !draft.title.trim() || !draft.description.trim() || (uncertain && !acknowledged)) return;
+    submissionLock.current = true;
+    setSubmitting(true);
+    setSubmitError("");
+    setUncertain(false);
+    setAcknowledged(false);
+    try {
+      const key = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
+      const result = await createFinding(session, { project, siteId: jira.site.id, title: draft.title.trim(), description: draft.description }, key);
+      setDraft(emptyDraft);
+      setCreatedMessage(`Created ${result.issueKey}.`);
+      setHistoryVersion(value => value + 1);
+      setView("findings");
+    } catch (error) {
+      if (error instanceof SessionChanged) onSessionChanged();
+      else if (error instanceof RejectedFinding) setSubmitError(error.message);
+      else if (error instanceof CreatedNotRecorded) { setUncertain(true); setSubmitError(error.message); }
+      else {
+        setUncertain(true);
+        setSubmitError("The creation outcome is unknown. Check Jira before trying again; another attempt may create a duplicate.");
+      }
+    } finally {
+      submissionLock.current = false;
+      setSubmitting(false);
+    }
+  }
+
   function leave(destination: Destination) {
+    if (submissionLock.current) return;
     if (hasDraft) {
       returnFocus.current =
         destination === "signout"
@@ -181,12 +246,14 @@ export function Shell({
         <nav aria-label="Main navigation">
           <button
             className={view !== "settings" ? "active" : ""}
+            disabled={submitting}
             onClick={() => leave("findings")}
           >
             Findings
           </button>
           <button
             className={view === "settings" ? "active" : ""}
+            disabled={submitting}
             onClick={() => leave("settings")}
           >
             Settings
@@ -195,6 +262,7 @@ export function Shell({
         <DropdownMenu.Root>
           <DropdownMenu.Trigger
             ref={accountButton}
+            disabled={submitting}
             className="account"
             aria-label={`Account: ${session.user.email}`}
           >
@@ -224,6 +292,13 @@ export function Shell({
           draft={draft}
           onChange={setDraft}
           onBack={() => leave("findings")}
+          onSubmit={() => { void submitFinding(); }}
+          busy={submitting}
+          canSubmit={Boolean(confirmedSessionRefresh === sessionRefresh && jira?.connected && jira.site && project && draft.project === project)}
+          error={submitError}
+          uncertain={uncertain}
+          acknowledged={acknowledged}
+          onAcknowledge={setAcknowledged}
         />
       ) : view === "settings" ? (
         <Settings
@@ -253,6 +328,7 @@ export function Shell({
               className="primary-button"
               onClick={() => {
                 setFocusFindings(false);
+                setCreatedMessage("");
                 if (project) setDraft((current) => ({ ...current, project }));
                 setView("report");
               }}
@@ -306,15 +382,39 @@ export function Shell({
             <p className="subtitle">
               Tickets created by this app, not your entire Jira history.
             </p>
-            <div className="ledger-empty">
-              <h3>Ticket history is not available yet</h3>
-              <p>
-                Ticket creation and history will be connected in the next phase.
-              </p>
-              <button className="text-button" onClick={() => setView("report")}>
-                Prepare a local draft
-              </button>
-            </div>
+            {createdMessage && <p role="status">{createdMessage}</p>}
+            {!project ? (
+              <div className="ledger-empty"><p>Select a Jira project to see recent tickets.</p></div>
+            ) : confirmedSessionRefresh !== sessionRefresh || ticketContext !== currentTicketContext || ticketsLoading ? (
+              <p role="status">Loading recent tickets…</p>
+            ) : ticketsError ? (
+              <div>
+                <p role="alert">{ticketsError}</p>
+                <button className="text-button" onClick={() => setHistoryVersion(value => value + 1)}>
+                  Retry tickets
+                </button>
+              </div>
+            ) : tickets.length === 0 ? (
+              <div className="ledger-empty">
+                <h3>No tickets yet</h3>
+                <p>Tickets created in this project will appear here.</p>
+              </div>
+            ) : (
+              <ul className="ticket-list">
+                {tickets.map(ticket => {
+                  const safeUrl = jira?.site && safeTicketUrl(ticket.url, ticket.issueKey, jira.site.url);
+                  return (
+                    <li key={ticket.issueKey}>
+                      <div>
+                        <strong>{ticket.title}</strong><br />
+                        {safeUrl ? <a href={safeUrl} target="_blank" rel="noopener noreferrer">{ticket.issueKey}</a> : <span>{ticket.issueKey}</span>}
+                      </div>
+                      <time dateTime={ticket.createdAt}>{new Date(ticket.createdAt).toLocaleString()}</time>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
         </main>
       )}
@@ -340,7 +440,7 @@ export function Shell({
           >
             <AlertDialog.Title>Discard this draft?</AlertDialog.Title>
             <AlertDialog.Description>
-              Leaving or signing out clears this draft. Nothing has been sent.
+              Leaving or signing out clears this draft. Check Jira if a previous creation outcome was uncertain.
             </AlertDialog.Description>
             <div className="dialog-actions">
               <AlertDialog.Cancel ref={keepEditing}>

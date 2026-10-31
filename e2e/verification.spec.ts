@@ -24,7 +24,6 @@ test("@verification a real account switch in another tab clears the first user's
   await register(page, second);
   await signIn(page, first);
   await page.getByRole("button", { name: /report finding/i }).click();
-  await page.getByLabel("Project key (unverified)").fill("PRIVATE");
   await page.getByLabel("Finding title").fill("First user's private draft");
   const otherTab = await context.newPage();
   await otherTab.goto("/");
@@ -36,7 +35,6 @@ test("@verification a real account switch in another tab clears the first user's
   await expect(page.getByRole("button", { name: `Account: ${second}` })).toBeVisible();
   await expect(page.getByRole("alert")).toContainText("account changed");
   await page.getByRole("button", { name: /report finding/i }).click();
-  await expect(page.getByLabel("Project key (unverified)")).toHaveValue("");
   await expect(page.getByLabel("Finding title")).toHaveValue("");
   await expect(page.getByText("First user's private draft")).toHaveCount(0);
 });

@@ -494,3 +494,12 @@ h2 {
   border-radius: 4px;
   background: transparent;
 }
+
+.ticket-list { list-style: none; padding: 0; margin: 1.5rem 0; border-top: 1px solid #d6d8d4; }
+.ticket-list li { display: flex; justify-content: space-between; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #d6d8d4; }
+.ticket-list a { color: #17675b; }
+.ticket-list time { color: #59645f; font-size: .9rem; }
+@media (max-width: 600px) { .ticket-list li { flex-direction: column; gap: .4rem; } }
+
+.composer label.acknowledge { display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; }
+.composer .acknowledge input { display: inline-block; flex: 0 0 auto; width: 18px; height: 18px; min-height: 0; margin: 3px 0 0; padding: 0; }

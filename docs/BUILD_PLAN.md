@@ -72,7 +72,7 @@ The session-authenticated finding service, project authorization, Jira issue cre
 
 ### 4B. Jira connection and findings UI
 
-The current slice connects settings, site selection, and project selection to the authenticated APIs. It offers setup guidance and a retry after a project discovery failure. Browser scenarios cover missing or invalid configuration and confirm that a fake OAuth exchange was actually attempted and rejected. The next slice connects the finding form and recent-ticket view, including safe links and uncertain write outcomes. Verify both slices with browser tests and fake providers.
+The current slice connects settings, site selection, and project selection to the authenticated APIs. It offers setup guidance and a retry after a project discovery failure. Browser scenarios cover missing or invalid configuration and confirm that a fake OAuth exchange was actually attempted and rejected. The current findings slice connects the form and recent-ticket view, binds browser requests to the selected site, validates safe links, and prevents silent retries after uncertain write outcomes. Browser tests use fake providers and isolated databases.
 
 ### 5. External API
 

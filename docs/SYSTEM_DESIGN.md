@@ -1,6 +1,6 @@
 # IdentityHub system design
 
-This diagram describes the planned end state. The current implementation includes the web account flow, authentication, session-bound Jira OAuth and encrypted credentials, site/project discovery, session-based finding creation and history, and a workspace shell with local drafts; Jira UI integration, API keys, and the digest remain planned.
+This diagram describes the planned end state. The current implementation includes the web account flow, authentication, session-bound Jira OAuth and encrypted credentials, site/project discovery, session-based finding creation and history, and a workspace shell with connection, site and project selection and local drafts; finding creation and history UI, API keys, and the digest remain planned.
 
 ```mermaid
 flowchart LR
@@ -52,9 +52,9 @@ If the remote outcome is uncertain, the operation remains blocked for human revi
 
 ## Trust boundaries
 
-The standalone fake Atlassian service listens on loopback only and accepts a configured loopback callback. It uses public fixed test values, keeps no user data, and is not wired into the app. The existing Docker mock profile cannot expose its container-loopback listener and is not supported. Its limited protocol shapes follow [Atlassian's 3LO documentation](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/); it does not enforce real OAuth replay protection.
+The standalone fake Atlassian service listens on loopback only and accepts a configured loopback callback. It uses public fixed test values, keeps no user data, and is not wired into the app. The browser test server separately injects a fake transport and runs isolated missing-configuration, invalid-key, and rejected-token-exchange scenarios; it does not use inherited Jira credentials. The existing Docker mock profile cannot expose its container-loopback listener and is not supported. Its limited protocol shapes follow [Atlassian's 3LO documentation](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/); it does not enforce real OAuth replay protection.
 
-The Jira boundary uses `jira.js` for authorization URLs and code exchange. The authenticated, CSRF-protected start route stores only a hash of a random state, bound to the user and session for ten minutes. The callback atomically consumes matching, unexpired state, exchanges the code, and stores encrypted tokens only if the initiating session remains valid. Session deletion removes its state. AES-256-GCM uses a random nonce and authenticates the user and token type; the 32-byte key is configured outside the database. Request logs omit query strings, and Jira responses use no-store and no-referrer. The token request is restricted to Atlassian's documented endpoint, rejects redirects, times out, and bounds response size. Tests use fake transports without network access. Refresh is single-flight per user in one server process; the database records an in-progress rotation before contacting Atlassian and requires reconnection after an uncertain outcome. Site selection and project discovery are scoped to the user.
+The Jira boundary uses `jira.js` for authorization URLs and code exchange. The authenticated, CSRF-protected start route stores only a hash of a random state, bound to the user and session for ten minutes. The callback atomically consumes matching, unexpired state, exchanges the code, and stores encrypted tokens only if the initiating session remains valid. Session deletion removes its state. AES-256-GCM uses a random nonce and authenticates the user and token type; the 32-byte key is configured outside the database. Request logs omit query strings, and Jira responses use no-store and no-referrer. The token request is restricted to Atlassian's documented endpoint, rejects redirects, times out, and bounds response size. Tests use fake transports without network access. Refresh is single-flight per user in one server process; the database records an in-progress rotation before contacting Atlassian and requires reconnection after an uncertain outcome. Site selection and project discovery are scoped to the user. The status endpoint returns only configuration, saved connection state, and selected site for the authenticated session. The browser checks session identity around Jira requests and discards stale results. OAuth callback redirects use fixed local paths and do not include provider codes or state.
 
 The current account flow stores hashed session IDs and uses session-bound CSRF tokens. Jira tokens are encrypted at rest; API keys will be stored as hashes in a later phase. The planned digest will treat blog and model output as untrusted, fetch only allowed hosts, supply article text as data to a tool-free model, validate the response, and avoid storing article text. Real provider behavior requires separate owner verification; automated tests use fakes.
 
@@ -157,9 +157,9 @@ The current application stores hashes of session IDs and encrypted Jira tokens i
 
 ## UI foundation
 
-The signed-in shell uses a Radix dropdown for account actions and calls only the existing authentication API. The shell labels Jira functionality as unavailable; it does not contact Jira or introduce new server routes.
+The signed-in shell uses a Radix dropdown for account actions. The browser calls only our authentication and Jira APIs; Jira requests remain behind the server boundary. Settings connects and selects a site, while Findings selects a discovered project.
 
-The current reporting view keeps draft text in component memory and does not send or persist it. The browser may suppress unload warnings. The reporting view is not yet connected to the findings API or Jira connection.
+The current reporting view keeps draft text in component memory and does not send or persist it. The browser may suppress unload warnings. Project selection is held in memory and can populate the draft; the reporting view does not submit to the findings API.
 
 Session rechecks use the existing API. The signed-in workspace is keyed by user identity so a confirmed account change discards the previous user's in-memory draft. A transient check failure leaves it in place.
 

@@ -7,7 +7,7 @@ test("draft stays local and confirms before leaving", async ({ page }) => {
   await page.getByRole("button", { name: "Create account" }).click();
   await page.getByRole("status").waitFor();
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText("Ticket history is unavailable")).toBeVisible();
+  await expect(page.getByText("Ticket history is not available yet")).toBeVisible();
   await page.getByRole("button", { name: /report finding/i }).click();
   await page.getByLabel("Finding title").fill("Example finding");
   await expect(

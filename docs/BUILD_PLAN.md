@@ -58,7 +58,7 @@ Add the responsive workspace shell, local finding drafts, settings, and session 
 
 ### 3. Jira connection
 
-Groundwork: the standalone local fake models authorization, code exchange, and accessible resources. The app starts OAuth, validates session-bound state, exchanges the code, and stores user-scoped encrypted tokens. Tests use fakes without provider calls. Refresh rotation, user coordination, site selection, and project discovery are implemented in the backend; owner-run live verification and UI integration remain outstanding.
+Groundwork: the standalone local fake models authorization, code exchange, and accessible resources. The app starts OAuth, validates session-bound state, exchanges the code, and stores user-scoped encrypted tokens. Tests use fakes without provider calls. Refresh rotation, user coordination, site selection, and project discovery are implemented in the backend; the owner completed a live OAuth callback and saved a site, while live project discovery and ticket creation remain unverified; connection and selection UI are implemented in the current slice.
 
 Recheck current Atlassian documentation; implement a fake service, OAuth connection, encrypted token storage, refresh rotation with a per-user lock, and project discovery.
 
@@ -72,7 +72,7 @@ The session-authenticated finding service, project authorization, Jira issue cre
 
 ### 4B. Jira connection and findings UI
 
-Connect settings, site and project selection, the finding form, and the recent-ticket view to the authenticated APIs. Verify the complete flow in browser tests with fake providers; links open safely in a new tab.
+The current slice connects settings, site selection, and project selection to the authenticated APIs. It offers setup guidance and a retry after a project discovery failure. Browser scenarios cover missing or invalid configuration and confirm that a fake OAuth exchange was actually attempted and rejected. The next slice connects the finding form and recent-ticket view, including safe links and uncertain write outcomes. Verify both slices with browser tests and fake providers.
 
 ### 5. External API
 
@@ -114,8 +114,8 @@ The reporting view holds an unsent draft in memory, warns before leaving, and do
 
 ## Settings and session handling (merged, PR #5)
 
-Settings uses accessible tabs for unavailable Jira and API-key features. Session checks use the existing endpoint on focus and visibility changes; no authentication contract was added.
+That phase introduced accessible tabs for the then-unavailable Jira and API-key features. Jira connection is now available in the current slice. Session checks use the existing endpoint on focus and visibility changes.
 
 ## Backend review and security fixes (merged, PRs #6 and #7)
 
-The project-local Fastify reference and a review of existing authentication and session handling are available in `docs/BACKEND_REVIEW.md`. The identified cache policy and stalled session-check issues were fixed; provider integration has not started.
+The project-local Fastify reference and a review of existing authentication and session handling are available in `docs/BACKEND_REVIEW.md`. The identified cache policy and stalled session-check issues were fixed; the review predates provider integration.

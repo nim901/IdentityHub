@@ -73,6 +73,6 @@ test("account menu supports keyboard and reports unavailable services", async ({
   await page.keyboard.press("Escape");
   await expect(account).toBeFocused();
   await expect(
-    page.getByText(/Jira integration is not available/i),
+    page.getByText(/Connect Jira and select a site/i),
   ).toBeVisible();
 });

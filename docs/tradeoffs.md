@@ -94,3 +94,11 @@ The user selects one accessible Jira Cloud site; each project query checks curre
 ## Jira create metadata and duplicate prevention
 
 We inspect Jira's project and issue-type create metadata before writing and select a supported non-subtask type, preferring the optional configured name and then Task. This deliberately rejects configurations with unsupported required fields rather than guessing. A bounded in-memory per-site queue and a user-scoped idempotency reservation reduce duplicate creation; they do not provide distributed coordination or exactly-once delivery. Unknown outcomes require manual investigation, and the caller must not use a new key without checking Jira. The local recent list is user-isolated but does not reflect external edits. Sites with custom domains are not supported. Live behavior and permissions still need owner verification.
+
+## Connection UI and callback
+
+Connection status reports saved credentials, not a live guarantee of Jira access; site and project discovery can still fail and prompt reconnection. OAuth callbacks return to fixed paths on the API origin, so local OAuth uses the built app on that origin. Project choice is held in memory and resets on site or account changes. Browser tests inject a fake transport into a dedicated server process, with no production fake switch.
+
+Browser failure scenarios start isolated servers with missing or invalid Jira configuration or a fake token-exchange error. The harness clears inherited Jira settings so the missing-configuration case cannot accidentally use local credentials. The exchange fake writes only an operation marker to the test's temporary directory to prove that the token request occurred; the directory is removed after the run. These tests exercise our application and a fake provider; they do not establish live Atlassian compatibility.
+
+The browser includes its session-bound CSRF token with Jira reads. The server validates that token when supplied, so a cookie change during an in-flight read cannot return another account's Jira data to the old view. Callers without the header retain the existing read contract. A successful focus or visibility session check refreshes connection status so another tab's site selection becomes visible.

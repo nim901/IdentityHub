@@ -8,7 +8,7 @@ Use TypeScript in strict mode, React and Vite for the web interface, Fastify for
 
 ## Planned interfaces
 
-The browser calls only our API. Session-authenticated writes require a CSRF token. Health, authentication, Jira OAuth, site and project discovery, and session-authenticated finding creation and history are implemented. The Jira UI and API key management are implemented; the scanner endpoint is implemented and the digest remains planned.
+The browser calls only our API. Session-authenticated writes require a CSRF token. Health, authentication, Jira OAuth, site and project discovery, and session-authenticated finding creation and history are implemented. The Jira UI and API key management are implemented; the scanner endpoint and digest command are implemented.
 
 | Interface | Purpose |
 | --- | --- |
@@ -123,4 +123,9 @@ The project-local Fastify reference and a review of existing authentication and 
 
 ### Phase 6B status: summary preview
 
-The read-only preview composes discovery, a single-article text extractor, and a tool-free OpenAI API adapter. Fake-only tests cover the preview and failures. The article selector was checked against one public Oasis article; real model responses require owner-run verification; ChatGPT plan authorization, fallback, and Jira-writing digest orchestration remain future work.
+The read-only preview composes discovery, a single-article text extractor, and a tool-free OpenAI API adapter. Fake-only tests cover the preview and failures. The article selector was checked against one public Oasis article; real model responses require owner-run verification; ChatGPT plan authorization remains future work; fallback and Jira-writing orchestration are implemented in Phase 6C.
+
+
+### Phase 6C status: digest command
+
+The local command binds an existing configured user to their Jira connection, reuses the finding service, and reserves each user/post before a write. Dry runs skip reservations and Jira writes. Missing or failed AI uses a labeled extractive fallback with exit code 3 unless `--require-ai` is set. Pending and unknown outcomes block retries; a pending reservation older than 30 minutes is marked unknown on the next non-dry attempt. A definite Jira rejection or confirmed pre-write site mismatch permits retry. Live provider and Docker verification remain outstanding.

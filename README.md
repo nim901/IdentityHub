@@ -1,6 +1,6 @@
 # IdentityHub
 
-IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth, encrypted rotating credentials, site and project discovery, and a session-authenticated finding-to-Jira API. The Jira connection, site and project selection, finding form, and recent-ticket UI are implemented; API key management is implemented; the scanner endpoint is implemented and the AI digest remains incomplete. The owner has completed a live OAuth callback and saved a Jira site; live project discovery and ticket creation remain unverified.
+IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth, encrypted rotating credentials, site and project discovery, and a session-authenticated finding-to-Jira API. The Jira connection, site and project selection, finding form, and recent-ticket UI are implemented; API key management is implemented; the scanner endpoint and AI digest command are implemented. The owner has completed a live OAuth callback and saved a Jira site; live project discovery and ticket creation remain unverified.
 
 ## Requirements
 
@@ -115,7 +115,7 @@ Authentication responses include `Cache-Control: no-store`. Session checks have 
 
 Passwords are stored as Argon2id hashes. Session cookies are HttpOnly and SameSite=Lax, and are marked Secure when `APP_BASE_URL` uses HTTPS. The cookie contains a random session identifier; only its hash is stored in SQLite. Security headers and request size limits are enabled. This is a single-instance proof of concept, not a production-ready deployment.
 
-The account implementation does not use `SESSION_SECRET`. The root `digest` command remains a placeholder; the separate read-only summary preview is described below.
+The account implementation does not use `SESSION_SECRET`. The digest command and read-only summary preview are described below.
 
 ## Local fake Atlassian service
 
@@ -137,7 +137,7 @@ The start endpoint requests `read:jira-work`, `write:jira-work` and `offline_acc
 - `server/src/routes/` handles HTTP and CSRF checks; `server/src/services/` contains authentication logic; `server/src/db/` contains the SQLite connection and authentication repository; `server/migrations/` defines the database schema.
 - [Build plan](docs/BUILD_PLAN.md), [system design](docs/SYSTEM_DESIGN.md), and [trade-offs](docs/tradeoffs.md) describe the planned work and decisions. [Changelog](CHANGELOG.md) records completed phases.
 
-The next phase implements the AI digest. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
+The next phase is owner-run live verification of the Jira and digest flows. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
 
 ## UI foundation
 
@@ -177,7 +177,7 @@ Send the API key only over HTTPS and keep it out of logs and source control. Sen
 
 ## Read-only blog discovery
 
-After `npm run build`, run `npm run discover:blog` to inspect the sitemap published in [Oasis robots.txt](https://www.oasis.security/robots.txt). It first checks robots.txt conservatively and prints JSON with the chosen URL, visible heading, publication date, and `sameDayCount`. It does not call an AI provider or create a Jira ticket. The full digest command remains future work.
+After `npm run build`, run `npm run discover:blog` to inspect the sitemap published in [Oasis robots.txt](https://www.oasis.security/robots.txt). It first checks robots.txt conservatively and prints JSON with the chosen URL, visible heading, publication date, and `sameDayCount`. It does not call an AI provider or create a Jira ticket.
 
 Oasis article pages inspected on 2026-10-31 show a visible “Published on” date and heading. Some JSON-LD `datePublished` values match later updates rather than the visible publication date, so discovery uses the visible date. Dates have day precision: it selects the latest day and uses the URL as a deterministic tie-breaker; `sameDayCount` reports how many posts share that date, without claiming which was published first within the day.
 
@@ -195,3 +195,14 @@ The body extractor requires exactly one `div` with both `blog-rich-text` and `w-
 The adapter currently uses an OpenAI API key. Eligible ChatGPT Pro or Business owners may be able to link their subscription to an API organization and use [subscription API credits](https://developers.openai.com/api/docs/guides/chatgpt-api-credits). OpenAI also documents [ChatGPT plan authorization for eligible open-source apps](https://developers.openai.com/siwc/token-sharing-open-source); IdentityHub does not yet implement that separate sign-in flow.
 
 The existing Docker runtime image includes the compiled preview, and Compose passes the configured environment into the app container. Container build and preview behavior have not been verified for this slice because Docker was unavailable.
+
+
+## Digest command
+
+After `npm run build`, configure `DATABASE_PATH` (default `app.db`), `DIGEST_USER_EMAIL`, and `DIGEST_PROJECT_KEY` in the process environment. The email must identify an existing IdentityHub account with a connected Jira site; a non-dry run also requires the existing Jira OAuth settings and encryption key. Local commands do not automatically load `.env`. Set `AI_MODEL` and `AI_API_KEY` for OpenAI, or omit them to use an extractive fallback. The local operator controls which existing account runs the digest; restrict access to the database and environment.
+
+Run `npm run digest -- --dry-run` to preview without creating a ticket or digest reservation. Run `npm run digest -- --require-ai` to fail if AI is unavailable. Without `--require-ai`, model failure yields a clearly labeled extractive fallback and exit code 3, including on a successful fallback ticket creation. Normal success and already-created results exit 0; errors exit 1. The command sends article text to OpenAI when configured and can create a real Jira issue unless `--dry-run` is supplied.
+
+The command binds the write to the Jira site selected when the run started. The database reserves each user and post before a Jira write. Completed posts are not created twice, even if the selected project changes. A pending or uncertain reservation blocks retries and requires human investigation; a pending reservation older than 30 minutes is marked unknown on the next non-dry attempt; even some failures before a write are conservatively treated as uncertain. A definite Jira rejection or a confirmed site mismatch before the write releases the reservation. If Jira confirms an issue but local recording fails, the issue key is reported and retry remains blocked. No article body is stored in the digest table. SQLite migrations can run even on a dry run.
+
+Docker Compose supplies `.env` and the persistent database volume to the app container. The command can be invoked inside that container with `npm run digest -- --dry-run`; container build and execution remain unverified on this machine because Docker is unavailable.

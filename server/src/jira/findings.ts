@@ -6,9 +6,9 @@ import type { SessionRecord } from '../db/authRepository.js';
 import { JiraConnection } from './connection.js';
 
 export type FindingInput = { project: string; title: string; description: string };
-export type FindingActor = { kind: 'session'; session: SessionRecord } | { kind: 'apiKey'; userId: string; siteId: string; projectId: string; requestIdentity: string; active: () => boolean };
+export type FindingActor = { kind: 'session'; session: SessionRecord } | { kind: 'digest'; userId: string } | { kind: 'apiKey'; userId: string; siteId: string; projectId: string; requestIdentity: string; active: () => boolean };
 export class FindingError extends Error {
-  constructor(public status: number, message: string, public issueKey?: string) { super(message); }
+  constructor(public status: number, message: string, public issueKey?: string, public definiteRejection = false) { super(message); }
 }
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const issueId = z.string().regex(/^[0-9]{1,32}$/);
@@ -45,7 +45,7 @@ export class FindingsService {
     }
     const { client, site, credentialVersion, canWrite } = await this.connection.clientFor(userId);
     if (principal.kind === 'apiKey' && site.cloud_id !== principal.siteId) throw new FindingError(403, 'API key site is not selected.');
-    if (expectedSiteId && site.cloud_id !== expectedSiteId) throw new FindingError(409, 'Jira site changed.');
+    if (expectedSiteId && site.cloud_id !== expectedSiteId) throw new FindingError(409, 'Jira site changed.', undefined, true);
     return this.enqueue(site.cloud_id, async () => {
       if (!canWrite) throw new FindingError(403, 'Reconnect Jira to grant issue creation access.');
       const keyHash = hash(idempotencyKey);
@@ -54,7 +54,7 @@ export class FindingsService {
         : hash(JSON.stringify([site.cloud_id, input.project, input.title, input.description]));
       if (principal.kind === 'apiKey' && !principal.active()) throw new FindingError(401, 'Invalid API key');
       const existing = this.operation(userId, keyHash);
-      if (existing && principal.kind === 'session') return this.previous(userId, site.cloud_id, existing, requestHash);
+      if (existing && principal.kind !== 'apiKey') return this.previous(userId, site.cloud_id, existing, requestHash);
       const projects = await this.connection.projectList(client);
       const matches = projects.filter(project => project.key === input.project);
       if (!matches.length) throw new FindingError(principal.kind === 'apiKey' ? 404 : 403, 'Jira project is not available.');
@@ -68,7 +68,7 @@ export class FindingsService {
         return this.previous(userId, site.cloud_id, existing, requestHash);
       }
       const type = await this.chooseIssueType(client, input.project);
-      const active = principal.kind === 'session' ? this.db.prepare('SELECT 1 FROM sessions WHERE id_hash = ? AND user_id = ? AND expires_at > ?').get(principal.session.id_hash, userId, new Date().toISOString()) : principal.active();
+      const active = principal.kind === 'session' ? this.db.prepare('SELECT 1 FROM sessions WHERE id_hash = ? AND user_id = ? AND expires_at > ?').get(principal.session.id_hash, userId, new Date().toISOString()) : principal.kind === 'apiKey' ? principal.active() : this.db.prepare('SELECT 1 FROM users WHERE id = ?').get(userId);
       if (!active) throw new FindingError(401, principal.kind === 'session' ? 'Not signed in' : 'Invalid API key');
       const unchanged = this.db.prepare("SELECT 1 FROM jira_sites s JOIN jira_credentials c ON c.user_id = s.user_id WHERE s.user_id = ? AND s.cloud_id = ? AND s.site_url = ? AND c.access_token_enc = ? AND c.refresh_status = 'ready'")
         .get(userId, site.cloud_id, site.site_url, credentialVersion);
@@ -89,7 +89,7 @@ export class FindingsService {
       } catch (error) {
         if (isApiError(error) && [400, 401, 403, 404, 422, 429].includes(error.status)) {
           this.db.prepare("DELETE FROM finding_operations WHERE user_id = ? AND key_hash = ? AND status = 'pending'").run(userId, keyHash);
-          throw new FindingError(error.status === 429 ? 429 : 502, 'Jira rejected the finding.');
+          throw new FindingError(error.status === 429 ? 429 : 502, 'Jira rejected the finding.', undefined, true);
         }
         this.markUnknown(userId, keyHash);
         throw new FindingError(502, 'The Jira outcome is unknown. Check Jira before retrying.');

@@ -2,7 +2,14 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 6B - Article summary preview (in review)
+## Phase 6C - Digest command (in review)
+
+- Add the digest command, a per-user post reservation, dry runs, explicit degraded fallback, and a shared finding-service path. Pending or uncertain outcomes block retries; a definite Jira rejection permits retry.
+- Automated tests use fake providers and isolated data. Live Jira and model behavior remain for owner verification.
+- Review: a confirmed site mismatch before the Jira write releases the reservation and reports that no issue was created; fake CLI coverage now counts writes across users and uncertain retries.
+- Review verification: 88 server tests, lint, build, and diff checks passed. The added fake CLI test first failed until fake write counting was implemented; the fresh run passed. Browser tests were not rerun because this slice changes no browser flow. Docker was unavailable.
+
+## Phase 6B - Article summary preview (merged, PR #20)
 
 - Add a read-only summary preview with bounded article extraction and a tool-free OpenAI Responses adapter. The selected article is untrusted, its text stays in memory, and the provider response is validated.
 - Tests use fake transports only. An authorized read-only check of one Oasis article confirmed the body selector; OpenAI compatibility remains unverified. Direct ChatGPT plan OAuth and the Jira-writing digest command are not implemented.

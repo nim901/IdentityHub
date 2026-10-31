@@ -85,7 +85,7 @@ The draft is kept in memory so it is not retained in browser storage. It is lost
 
 ## Settings tabs
 
-Radix Tabs supplies keyboard navigation for the Jira and scanner settings panels. The panels describe unavailable services and do not simulate connections or keys.
+Radix Tabs supplies keyboard navigation for the Jira and scanner settings panels. The panels report connection state and use the application API for real key management.
 
 ## Jira site discovery
 
@@ -111,4 +111,9 @@ The UI includes the expected site ID on finding writes and history reads to dete
 
 ## API key management
 
-Keys use 32 random bytes and are stored as SHA-256 hashes with a short display prefix. A key belongs to one user and Jira site and records one to twenty project keys and their discovered project IDs. Jira project keys can change ([Atlassian CLI documentation](https://developer.atlassian.com/cloud/acli/reference/commands/jira-project-update/)); the future scanner must resolve and enforce the stored project IDs, and reject legacy records missing IDs. The compatibility migration preserves earlier records without guessing IDs; the UI labels them for replacement and permits revocation. Creation rechecks the session and site after discovery; existing keys can be listed and revoked without a live Jira connection. The UI shows the secret once in memory and treats failed or lost creation responses as uncertain, directing the user to reconcile the list. In-app navigation is disabled during key creation and an unload warning is requested; browsers may suppress that warning. At most 20 keys can be active and the list returns up to 100 entries, with active keys first. The scanner API is not yet implemented, so these restrictions are not yet used to authorize scanner requests.
+Keys use 32 random bytes and are stored as SHA-256 hashes with a short display prefix. A key belongs to one user and Jira site and records one to twenty project keys and their discovered project IDs. Jira project keys can change ([Atlassian CLI documentation](https://developer.atlassian.com/cloud/acli/reference/commands/jira-project-update/)); the scanner resolves and enforces stored project IDs, and rejects legacy records missing IDs. The compatibility migration preserves earlier records without guessing IDs; the UI labels them for replacement and permits revocation. Creation rechecks the session and site after discovery; existing keys can be listed and revoked without a live Jira connection. The UI shows the secret once in memory and treats failed or lost creation responses as uncertain, directing the user to reconcile the list. In-app navigation is disabled during key creation and an unload warning is requested; browsers may suppress that warning. At most 20 keys can be active and the list returns up to 100 entries, with active keys first. The scanner API enforces these restrictions against freshly discovered Jira project IDs.
+
+
+## Scanner API
+
+The scanner accepts an optional idempotency key to support clients that cannot provide one, but requests without one cannot be safely retried. The supplied key is scoped to the API key, so different keys do not share replay records. The fingerprint retains the separately validated fields rather than only the formatted description, so different inputs cannot be mistaken for the same request. Scanner operations from the previous uncommitted implementation fail closed with a conflict if replayed after this fingerprint change. Metadata fields are bounded plain text appended to the Jira description. A single-process IP rate limit limits abuse; it is not a distributed quota. Queued or in-flight requests check revocation before the Jira write, but an already dispatched provider request cannot be recalled.

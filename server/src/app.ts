@@ -18,6 +18,7 @@ import { FindingsService } from "./jira/findings.js";
 import { findingsRoutes } from "./routes/findings.js";
 import { ApiKeyService } from "./services/apiKeys.js";
 import { apiKeyRoutes } from "./routes/apiKeys.js";
+import { scannerRoutes } from "./routes/scanner.js";
 
 export async function buildApp(
   options: {
@@ -47,7 +48,7 @@ export async function buildApp(
   await app.register(cookie);
   await app.register(helmet);
   app.addHook("onRequest", async (request, reply) => {
-    if (request.routeOptions.url?.startsWith("/api/auth/") || request.routeOptions.url?.startsWith("/api/jira/") || request.routeOptions.url === "/api/findings" || request.routeOptions.url?.startsWith("/api/keys")) {
+    if (request.routeOptions.url?.startsWith("/api/auth/") || request.routeOptions.url?.startsWith("/api/jira/") || request.routeOptions.url === "/api/findings" || request.routeOptions.url?.startsWith("/api/keys") || request.routeOptions.url === "/api/v1/findings") {
       reply.header("Cache-Control", "no-store");
       reply.header("Referrer-Policy", "no-referrer");
     }
@@ -78,9 +79,12 @@ export async function buildApp(
   }
   const connection = oauth ? new JiraConnection(db, oauth) : undefined;
   await app.register(async (instance) => jiraRoutes(instance, auth, oauth, connection));
-  await app.register(async instance => apiKeyRoutes(instance, auth, new ApiKeyService(db, connection)));
+  const keys = new ApiKeyService(db, connection);
+  await app.register(async instance => apiKeyRoutes(instance, auth, keys));
   const defaultIssueType = process.env.JIRA_DEFAULT_ISSUE_TYPE;
-  await app.register(async (instance) => findingsRoutes(instance, auth, connection ? new FindingsService(db, connection, defaultIssueType && defaultIssueType.length <= 255 ? defaultIssueType : undefined) : undefined));
+  const findings = connection ? new FindingsService(db, connection, defaultIssueType && defaultIssueType.length <= 255 ? defaultIssueType : undefined) : undefined;
+  await app.register(async (instance) => findingsRoutes(instance, auth, findings));
+  await app.register(async instance => scannerRoutes(instance, keys, findings));
   app.get("/healthz", async () => ({ status: "ok" }));
   const webRoot = resolve(
     fileURLToPath(new URL("../../web/dist", import.meta.url)),

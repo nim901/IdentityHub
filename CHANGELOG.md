@@ -2,7 +2,14 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 5A - API key management (in review)
+## Phase 5B - Scanner API (in review)
+
+- Add API-key-authenticated finding creation, project-ID and site checks, revocation rechecks, bounded input, rate limiting, and optional idempotency via the shared Jira finding service.
+- Review fixed conflicting scanner requests being treated as replays when their fields formatted to the same Jira description, and corrected stale endpoint availability text. Previous uncommitted scanner fingerprints fail closed on replay.
+- Add fake-provider security and end-to-end scenarios and an OpenAPI contract. Docker and owner-run live scanner verification remain outstanding.
+- Review verification: 38 server tests, lint, build, and 28 browser tests passed using fake providers and isolated data. The fingerprint regression first reproduced a 200 instead of 409; an initial browser run found an outdated Settings assertion. Both pass after fixes. Earlier implementation runs also included a test-server startup timeout. Docker was unavailable.
+
+## Phase 5A - API key management (merged, PR #17)
 
 - Add user-scoped key creation, listing, and revocation with SHA-256 hashes, one-time display, and selected-site and project restrictions. Scanner authentication and the scanner endpoint remain for the next slice.
 - Review fixed loss of the one-time secret when leaving during creation. New keys record discovered project IDs alongside keys; an additive migration preserves legacy records with missing IDs for future scanner authentication to reject until replaced.

@@ -124,9 +124,10 @@ async function run(testArguments: string[], scenario = "success") {
   }
 }
 
-await run(["--grep-invert", "@verification|@jira|@keys"]);
+await run(["--grep-invert", "@verification|@jira|@keys|@scanner"]);
 if (!process.exitCode) await run(["--grep", "@verification"]);
 if (!process.exitCode) await run(["--grep", "@keys"]);
+if (!process.exitCode) await run(["--grep", "@scanner"]);
 if (!process.exitCode) await run(["--grep", "@jira(?:\\s|$)"]);
 if (!process.exitCode) await run(["--grep", "@jira-missing"], "missing");
 if (!process.exitCode) await run(["--grep", "@jira-invalid"], "invalid");

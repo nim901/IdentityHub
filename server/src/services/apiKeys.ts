@@ -22,6 +22,26 @@ function publicKey(row: KeyRow) {
 export class ApiKeyService {
   constructor(private readonly db: Database.Database, private readonly connection?: JiraConnection) {}
 
+  authenticate(secret: unknown) {
+    if (typeof secret !== "string" || !/^ih_[A-Za-z0-9_-]{43}$/.test(secret)) return undefined;
+    const digest = createHash("sha256").update(secret).digest("hex");
+    const row = this.db.prepare("SELECT id, user_id, site_id, allowed_projects_json, allowed_project_ids_json FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL").get(digest) as { id: string; user_id: string; site_id: string; allowed_projects_json: string; allowed_project_ids_json: string | null } | undefined;
+    if (!row) return undefined;
+    try {
+      const projects: unknown = JSON.parse(row.allowed_projects_json);
+      const ids: unknown = JSON.parse(row.allowed_project_ids_json ?? "null");
+      if (!Array.isArray(projects) || !Array.isArray(ids) || projects.length < 1 || projects.length > 20 || ids.length !== projects.length ||
+          !projects.every(p => typeof p === "string" && /^[A-Z][A-Z0-9_]{0,31}$/.test(p)) ||
+          !ids.every(id => typeof id === "string" && id.length > 0 && id.length <= 128) ||
+          new Set(projects).size !== projects.length || new Set(ids).size !== ids.length) return undefined;
+      return { id: row.id, userId: row.user_id, siteId: row.site_id, projects: projects as string[], projectIds: ids as string[] };
+    } catch { return undefined; }
+  }
+
+  active(userId: string, keyId: string) {
+    return Boolean(this.db.prepare("SELECT 1 FROM api_keys WHERE user_id = ? AND id = ? AND revoked_at IS NULL").get(userId, keyId));
+  }
+
   list(userId: string) {
     const rows = this.db.prepare("SELECT id, name, key_prefix, site_id, allowed_projects_json, allowed_project_ids_json, created_at, revoked_at FROM api_keys WHERE user_id = ? ORDER BY revoked_at IS NULL DESC, created_at DESC, id DESC LIMIT 100").all(userId) as KeyRow[];
     return rows.map(publicKey);

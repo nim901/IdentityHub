@@ -1,6 +1,6 @@
 # IdentityHub
 
-IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth, encrypted rotating credentials, site and project discovery, and a session-authenticated finding-to-Jira API. The Jira connection, site and project selection, finding form, and recent-ticket UI are implemented; API key management is implemented; the scanner endpoint and AI digest remain incomplete. The owner has completed a live OAuth callback and saved a Jira site; live project discovery and ticket creation remain unverified.
+IdentityHub is a work-in-progress proof of concept for reporting non-human identity findings to Jira. The current version provides accounts, server-side sessions, a health endpoint, and Jira OAuth, encrypted rotating credentials, site and project discovery, and a session-authenticated finding-to-Jira API. The Jira connection, site and project selection, finding form, and recent-ticket UI are implemented; API key management is implemented; the scanner endpoint is implemented and the AI digest remains incomplete. The owner has completed a live OAuth callback and saved a Jira site; live project discovery and ticket creation remain unverified.
 
 ## Requirements
 
@@ -101,6 +101,7 @@ Server tests use an in-memory SQLite database and run one test file at a time, w
 | `GET /api/keys` | List the signed-in user's API key metadata. |
 | `POST /api/keys` | Create a site- and project-restricted key; returns the secret once and requires CSRF. |
 | `DELETE /api/keys/:id` | Revoke the signed-in user's key; requires CSRF. |
+| `POST /api/v1/findings` | Create a finding as an external scanner using `X-API-Key`; optionally supply an `Idempotency-Key`. |
 | `POST /api/findings` | Create a ticket from `project`, `title`, and `description`; accepts an optional expected `siteId` and requires a unique 16–128 character `Idempotency-Key` and CSRF token. |
 | `GET /api/findings?project=KEY` | Return up to ten of the signed-in user's locally recorded tickets. An optional `siteId` binds the request to the expected site. |
 
@@ -136,7 +137,7 @@ The start endpoint requests `read:jira-work`, `write:jira-work` and `offline_acc
 - `server/src/routes/` handles HTTP and CSRF checks; `server/src/services/` contains authentication logic; `server/src/db/` contains the SQLite connection and authentication repository; `server/migrations/` defines the database schema.
 - [Build plan](docs/BUILD_PLAN.md), [system design](docs/SYSTEM_DESIGN.md), and [trade-offs](docs/tradeoffs.md) describe the planned work and decisions. [Changelog](CHANGELOG.md) records completed phases.
 
-Next phases add the external scanner API and implement the AI digest. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
+The next phase implements the AI digest. Real Jira and AI checks require the owner to configure credentials and run them manually. Scheduling, automatic reconciliation, roles and teams, and production infrastructure are outside the current scope.
 
 ## UI foundation
 
@@ -144,7 +145,7 @@ The signed-in interface includes a responsive account shell and an accessible ac
 
 The Findings view shows up to ten app-created tickets for the selected project. The reporting view keeps its draft in memory until submission and creates a Jira ticket through the API. Leaving with a nonempty draft prompts for confirmation. Browsers control the reload or tab-close warning and may suppress it, especially on mobile. Drafts are lost on reload or process termination. Views do not create browser history entries or support deep links.
 
-Settings supports Jira connection and site selection when the server is configured. When configuration is missing or invalid, the connection button remains disabled and setup guidance identifies the required server variables. A failed project lookup offers a retry. API key management can create, list, and revoke project-restricted keys; the scanner endpoint remains unavailable. Session checks on focus or visibility changes retain drafts on temporary failures and clear them on confirmed expiry or account changes. If sign-out fails, the application does not claim the server session ended.
+Settings supports Jira connection and site selection when the server is configured. When configuration is missing or invalid, the connection button remains disabled and setup guidance identifies the required server variables. A failed project lookup offers a retry. API key management can create, list, and revoke project-restricted keys; the scanner endpoint accepts these keys. Session checks on focus or visibility changes retain drafts on temporary failures and clear them on confirmed expiry or account changes. If sign-out fails, the application does not claim the server session ended.
 
 The project-local Fastify reference and the current authentication review are described in [the backend review](docs/BACKEND_REVIEW.md). Its third-party examples are guidance, subject to this project's security and design decisions.
 
@@ -164,4 +165,11 @@ Finding submissions are never silently retried. If the outcome is unknown, check
 
 In Settings → API access, connect Jira and select a site, name a key, and select one to twenty accessible projects. The secret is shown only once; copy it before leaving the panel. IdentityHub stores a SHA-256 hash and a short identifying prefix, not the full key. Keys are bound to the selected site, user, and discovered Jira project IDs as well as their display keys; they can be revoked even after the Jira connection is lost. If creation cannot be confirmed, check the list and revoke an unwanted key before trying again. Navigation is disabled during creation and browsers are asked to warn before unloading; browsers may suppress that warning. The list shows up to 100 keys, with active keys first; at most 20 keys may be active.
 
-The external scanner endpoint is not implemented yet, so generated keys cannot authenticate scanner requests in this phase. The future endpoint must enforce the stored user, site, project IDs, and revocation, and reject older records that lack project IDs until those keys are replaced. Existing records without project IDs remain listable and revocable and are labelled “Needs replacement.” The new SQLite migrations are applied on server startup, including in the existing Docker setup; no new configuration variables are required. Docker build and runtime behavior remain unverified in this environment.
+The scanner endpoint enforces the stored user, site, project IDs, and revocation. It rejects older records that lack project IDs until those keys are replaced. Existing records without project IDs remain listable and revocable and are labelled “Needs replacement.” The new SQLite migrations are applied on server startup, including in the existing Docker setup; no new configuration variables are required. Docker build and runtime behavior remain unverified in this environment.
+
+
+## Scanner API
+
+`POST /api/v1/findings` accepts `X-API-Key` and JSON with `project`, `title`, and `description`; `type`, `severity`, and `resource` are optional text added to the Jira description. The key must belong to an active user connection and permit the selected site and discovered project ID. A key without project IDs must be replaced. See [the OpenAPI description](docs/scanner-openapi.yaml) for limits and response codes.
+
+Send the API key only over HTTPS and keep it out of logs and source control. Send an `Idempotency-Key` (16–128 letters, digits, `.`, `_`, `~`, or `-`) and retain it with the original request. A successful replay returns 200; different normalized fields or an unresolved prior outcome return 409. Idempotency is scoped to the API key, so changing keys does not preserve replay protection. If the outcome is unknown, check Jira before taking further action; the app never automatically repeats an uncertain write. Without the optional header, each request is a new operation and retries can create duplicates. Rate limiting is 30 requests per minute per source IP in one server process. No new environment variables or Docker settings are needed. Automated tests use fake providers; owner-run live scanner verification and Docker verification remain outstanding.

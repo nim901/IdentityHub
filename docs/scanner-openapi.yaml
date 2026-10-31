@@ -1,0 +1,58 @@
+openapi: 3.0.3
+info:
+  title: IdentityHub scanner API
+  version: 1.0.0
+paths:
+  /api/v1/findings:
+    post:
+      summary: Create a Jira finding in an allowed project
+      description: >-
+        A key is scoped to its owner, Jira site and allowed project IDs. Supply an
+        Idempotency-Key to safely repeat the same normalized request after a lost response.
+        An unresolved operation returns 409 and requires checking Jira; it is not retried.
+      security:
+        - apiKey: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: 16–128 characters from A–Z, a–z, 0–9, dot, underscore, tilde or hyphen; scoped to this API key.
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+            pattern: '^[A-Za-z0-9._~-]+$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [project, title, description]
+              properties:
+                project: { type: string, pattern: '^[A-Z][A-Z0-9_]{0,31}$' }
+                title: { type: string, minLength: 1, maxLength: 255 }
+                description: { type: string, minLength: 1, maxLength: 20000 }
+                type: { type: string, minLength: 1, maxLength: 128 }
+                severity: { type: string, minLength: 1, maxLength: 128 }
+                resource: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        '200': { description: Previously completed operation replayed; includes issueKey and url. }
+        '201': { description: Created; includes issueKey and url, with a Location header. }
+        '400': { description: Malformed JSON. }
+        '401': { description: Missing, invalid, revoked, or legacy API key. }
+        '403': { description: Project or site is not permitted, or Jira write permission is missing. }
+        '404': { description: The allowed project is not currently visible in Jira. }
+        '409': { description: Changed connection, conflicting request, or unresolved prior outcome. }
+        '413': { description: Request body exceeds 65536 bytes. }
+        '422': { description: Invalid input or unsupported Jira issue type; input errors include fields. }
+        '429': { description: Rate limit; includes Retry-After. }
+        '502': { description: Safe upstream failure or unknown outcome; do not blindly retry. }
+        '503': { description: Jira is unavailable or the creation queue is full. }
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key

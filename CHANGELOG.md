@@ -2,7 +2,16 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 4B.1 - Jira connection and project selection (in review)
+## Phase 4B.2 - Finding creation and recent tickets (in review)
+
+- Connect the form and project-scoped recent-ticket view to the session-authenticated finding API; validate Jira links before opening them in a new tab.
+- Prevent concurrent submissions, use one idempotency key per attempt, and require checking Jira before another attempt after an uncertain outcome. Drafts and uncertainty acknowledgment are in memory only.
+- Bind session-token-bearing recent-ticket reads to the active session. Refresh history on focus only after the selected-site status is confirmed, preventing another site's tickets from appearing under an outdated site label.
+- Bind browser finding writes and history reads to their expected site, and reject mismatches before returning tickets or issuing a Jira write. Existing API callers may omit the new optional field.
+- Treat unrecognized 401, 403, 422, and 429 write responses as uncertain instead of assuming no ticket was created; preserve the draft when the session check still succeeds. Browser tests also cover a lost response after a fake Jira write.
+- Review verification: 31 server tests, lint, the build, and 23 browser tests passed with fake providers and isolated data. Regression tests reproduced stale history, a site-refresh race, and unsafe classification of unrecognized responses before fixes; a lost-response test confirms one fake Jira write and no silent retry. Docker was unavailable. Live project discovery and live ticket creation remain unverified.
+
+## Phase 4B.1 - Jira connection and project selection (merged, PR #15)
 
 - Corrected the unconfigured Jira message so it does not imply an administrator role.
 - Added a visible disabled Jira connection button and setup guidance, and made failed project discovery explicitly retryable without silently clearing its error.

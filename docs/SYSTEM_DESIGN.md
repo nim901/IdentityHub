@@ -1,6 +1,6 @@
 # IdentityHub system design
 
-This diagram describes the planned end state. The current implementation includes the web account flow, authentication, session-bound Jira OAuth and encrypted credentials, site/project discovery, session-based finding creation and history, and a workspace shell with connection, site and project selection and local drafts; finding creation and history UI, API keys, and the digest remain planned.
+This diagram describes the planned end state. The current implementation includes the web account flow, authentication, session-bound Jira OAuth and encrypted credentials, site/project discovery, session-based finding creation and history, and a workspace shell with connection, site and project selection and local drafts; API keys and the digest remain planned; the finding creation and history UI is connected in the current slice.
 
 ```mermaid
 flowchart LR
@@ -159,7 +159,7 @@ The current application stores hashes of session IDs and encrypted Jira tokens i
 
 The signed-in shell uses a Radix dropdown for account actions. The browser calls only our authentication and Jira APIs; Jira requests remain behind the server boundary. Settings connects and selects a site, while Findings selects a discovered project.
 
-The current reporting view keeps draft text in component memory and does not send or persist it. The browser may suppress unload warnings. Project selection is held in memory and can populate the draft; the reporting view does not submit to the findings API.
+The reporting view keeps draft text in component memory until submission. It sends a session-bound request with one idempotency key, prevents parallel submissions, and does not automatically retry. Unknown outcomes require checking Jira before another attempt. The browser may suppress unload warnings; drafts and acknowledgment are lost on reload. Finding writes and history reads include the browser’s expected site ID; the API rejects a changed site before returning history or issuing a write. The optional field preserves compatibility for older API callers, which instead use their currently selected site. Recent-ticket reads carry the session binding token, wait for refreshed connection status on focus, and render results only for the current project and site. Unrecognized write responses are treated as uncertain.
 
 Session rechecks use the existing API. The signed-in workspace is keyed by user identity so a confirmed account change discards the previous user's in-memory draft. A transient check failure leaves it in place.
 

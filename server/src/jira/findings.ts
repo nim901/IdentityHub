@@ -24,16 +24,18 @@ export class FindingsService {
   private readonly queues = new Map<string, { tail: Promise<void>; count: number }>();
   constructor(private readonly db: Database.Database, private readonly connection: JiraConnection, private readonly defaultIssueType?: string) {}
 
-  recent(userId: string, project: string) {
+  recent(userId: string, project: string, expectedSiteId?: string) {
     const site = this.db.prepare('SELECT cloud_id FROM jira_sites WHERE user_id = ?').get(userId) as { cloud_id: string } | undefined;
+    if (expectedSiteId && site?.cloud_id !== expectedSiteId) throw new FindingError(409, 'Jira site changed.');
     if (!site) return [];
     const rows = this.db.prepare('SELECT issue_key, title, site_url, created_at FROM created_issues WHERE user_id = ? AND cloud_id = ? AND project_key = ? ORDER BY created_at DESC, issue_key DESC LIMIT 10')
       .all(userId, site.cloud_id, project) as Array<{ issue_key: string; title: string; site_url: string; created_at: string }>;
     return rows.map(row => ({ issueKey: row.issue_key, title: row.title, createdAt: row.created_at, url: `${row.site_url}/browse/${row.issue_key}` }));
   }
 
-  async create(session: SessionRecord, input: FindingInput, idempotencyKey: string) {
+  async create(session: SessionRecord, input: FindingInput, idempotencyKey: string, expectedSiteId?: string) {
     const { client, site, credentialVersion, canWrite } = await this.connection.clientFor(session.id);
+    if (expectedSiteId && site.cloud_id !== expectedSiteId) throw new FindingError(409, 'Jira site changed.');
     return this.enqueue(site.cloud_id, async () => {
       if (!canWrite) throw new FindingError(403, 'Reconnect Jira to grant issue creation access.');
       const keyHash = hash(idempotencyKey);

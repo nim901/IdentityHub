@@ -5,16 +5,22 @@ import { FindingError, type FindingsService } from '../jira/findings.js';
 import { SESSION_COOKIE } from './auth.js';
 
 const project = z.string().regex(/^[A-Z][A-Z0-9_]{0,31}$/);
-const input = z.object({ project, title: z.string().trim().min(1).max(255), description: z.string().min(1).max(20000) }).strict();
+const siteId = z.string().regex(/^[A-Za-z0-9-]{1,128}$/);
+const input = z.object({ project, siteId: siteId.optional(), title: z.string().trim().min(1).max(255), description: z.string().min(1).max(20000) }).strict();
 
 export async function findingsRoutes(app: FastifyInstance, auth: AuthService, findings?: FindingsService) {
   app.get('/api/findings', async (request, reply) => {
     const session = auth.session(request.cookies[SESSION_COOKIE]);
     if (!session) return reply.code(401).send({ error: 'Not signed in' });
-    const query = z.object({ project }).strict().safeParse(request.query);
+    const query = z.object({ project, siteId: siteId.optional() }).strict().safeParse(request.query);
     if (!query.success) return reply.code(422).send({ error: 'Select a valid project' });
     if (!findings) return reply.code(503).send({ error: 'Jira connection is not configured' });
-    return { findings: findings.recent(session.id, query.data.project) };
+    try {
+      return { findings: findings.recent(session.id, query.data.project, query.data.siteId) };
+    } catch (error) {
+      if (error instanceof FindingError) return reply.code(error.status).send({ error: error.message });
+      throw error;
+    }
   });
   app.post('/api/findings', async (request, reply) => {
     const session = auth.session(request.cookies[SESSION_COOKIE]);
@@ -24,7 +30,8 @@ export async function findingsRoutes(app: FastifyInstance, auth: AuthService, fi
     if (!parsed.success || !key.success) return reply.code(422).send({ error: 'Invalid finding or idempotency key' });
     if (!findings) return reply.code(503).send({ error: 'Jira connection is not configured' });
     try {
-      const result = await findings.create(session, parsed.data, key.data);
+      const { siteId: expectedSiteId, ...finding } = parsed.data;
+      const result = await findings.create(session, finding, key.data, expectedSiteId);
       if (auth.session(request.cookies[SESSION_COOKIE])?.id_hash !== session.id_hash) return reply.code(401).send({ error: 'Not signed in' });
       return reply.header('Location', result.url).code(result.replay ? 200 : 201).send({ issueKey: result.issueKey, url: result.url });
     } catch (error) {

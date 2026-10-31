@@ -42,6 +42,10 @@ it('creates a finding safely, prevents duplicate requests and isolates recent ti
   expect((await app.inject({ method: 'POST', url: '/api/jira/site', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken }, payload: { id: 'site-one' } })).statusCode).toBe(200);
   const payload = { project: 'ONE', title: 'Finding', description: '<script>not markup</script>' };
   const request = (id: string) => app.inject({ method: 'POST', url: '/api/findings', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken, 'idempotency-key': id }, payload });
+  const wrongSite = await app.inject({ method: 'POST', url: '/api/findings', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken, 'idempotency-key': 'fake-wrong-site-key-1' }, payload: { ...payload, siteId: 'other-site' } });
+  expect(wrongSite.statusCode).toBe(409);
+  expect(writes).toBe(0);
+  expect((await app.inject({ url: '/api/findings?project=ONE&siteId=other-site', headers: { cookie: a.cookie, 'x-csrf-token': a.csrfToken } })).statusCode).toBe(409);
   expect((await app.inject({ method: 'POST', url: '/api/findings', headers: { cookie: a.cookie }, payload })).statusCode).toBe(403);
   const result = await request('fake-idempotency-key-1');
   expect(result.statusCode).toBe(201);
@@ -57,6 +61,7 @@ it('creates a finding safely, prevents duplicate requests and isolates recent ti
   expect(recent.statusCode).toBe(200);
   expect(recent.json().findings).toHaveLength(2);
   expect((await app.inject({ url: '/api/findings?project=ONE', headers: { cookie: b.cookie } })).json().findings).toEqual([]);
+  expect((await app.inject({ url: '/api/findings?project=ONE', headers: { cookie: a.cookie, 'x-csrf-token': b.csrfToken } })).statusCode).toBe(403);
   allowWrite = false;
   expect((await request('fake-idempotency-key-5')).statusCode).toBe(403);
   expect(writes).toBe(2);

@@ -52,7 +52,7 @@ test("@jira connects a Jira site and selects a project through the app API", asy
   await page.getByLabel("Jira project").selectOption("ONE");
   await expect(page.getByLabel("Jira project")).toHaveValue("ONE");
   await expect(
-    page.getByText(/ticket history is not available/i),
+    page.getByText("No tickets yet"),
   ).toBeVisible();
   await page.route("**/api/jira/status", (route) => route.fulfill({ json: { configured: true, connected: true, site: { id: "site-two", name: "Other workspace", url: "https://other.atlassian.net" } } }));
   await page.route("**/api/jira/projects", (route) => route.fulfill({ json: { projects: [] } }));

@@ -6,7 +6,8 @@ if (!["success", "missing", "invalid", "exchange"].includes(scenario)) {
   throw new Error("Unknown E2E Jira scenario");
 }
 // This entrypoint exists only for browser tests. It refuses all outbound requests.
-const fakeFetch: typeof fetch = async (input) => {
+let writes = 0;
+const fakeFetch: typeof fetch = async (input, init) => {
   const url = new URL(String(input));
   if (url.href === "https://auth.atlassian.com/oauth/token") {
     if (scenario === "exchange") {
@@ -42,6 +43,22 @@ const fakeFetch: typeof fetch = async (input) => {
       isLast: true,
       values: [{ id: "100", key: "ONE", name: "Identity operations" }],
     });
+  const path = url.pathname.replace("/ex/jira/site-one", "");
+  if (url.origin === "https://api.atlassian.com" && path === "/rest/api/3/issue/createmeta/ONE/issuetypes")
+    return Response.json({ startAt: 0, total: 1, issueTypes: [{ id: "1", name: "Task", subtask: false }] });
+  if (url.origin === "https://api.atlassian.com" && path === "/rest/api/3/issue/createmeta/ONE/issuetypes/1")
+    return Response.json({ startAt: 0, total: 2, fields: [
+      { fieldId: "summary", operations: ["set"], required: true },
+      { fieldId: "description", operations: ["set"], required: false },
+    ] });
+  if (url.origin === "https://api.atlassian.com" && path === "/rest/api/3/issue" && init?.method === "POST") {
+    writes++;
+    if (process.env.E2E_FAKE_REQUEST_LOG) appendFileSync(process.env.E2E_FAKE_REQUEST_LOG, "issue_write\n");
+    const title = JSON.parse(String(init.body)).fields.summary;
+    if (title === "Unknown outcome") return new Response("fake provider failure", { status: 503 });
+    if (title === "Rejected finding") return new Response("fake rejection", { status: 400 });
+    return Response.json({ id: String(1000 + writes), key: `ONE-${writes}`, self: `https://api.atlassian.com/ex/jira/site-one/rest/api/3/issue/${1000 + writes}` }, { status: 201 });
+  }
   throw new Error("Unexpected provider request in browser test");
 };
 const baseUrl = process.env.APP_BASE_URL!;

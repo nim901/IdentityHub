@@ -61,7 +61,7 @@ export default function App() {
           setSession(null);
           setMessage("");
           setNotice(
-            "Your session ended. Any unsent draft was cleared. Please sign in again.",
+            "Your session ended. Any unsent draft was cleared. If a ticket was being created, check Jira before trying again. Please sign in again.",
           );
         } else {
           setSession(current);
@@ -69,7 +69,7 @@ export default function App() {
           setMessage(
             current.user.id === currentUserId
               ? ""
-              : "Your account changed. Any unsent draft was cleared.",
+              : "Your account changed. Any unsent draft was cleared. If a ticket was being created, check Jira before trying again.",
           );
         }
       } catch (error) {
@@ -117,7 +117,7 @@ export default function App() {
     ++requestVersion.current;
     setSession(null);
     setNotice(
-      "Your session or account changed. Any unsent draft was cleared. Please sign in again.",
+      "Your session or account changed. The draft was cleared. If a ticket was being created, check Jira before trying again. Please sign in again.",
     );
   }, []);
 

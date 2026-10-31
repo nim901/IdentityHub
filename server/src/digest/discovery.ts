@@ -1,4 +1,5 @@
 import { SaxesParser } from 'saxes';
+import { extractArticleText } from './article.js';
 import { parse, type DefaultTreeAdapterMap } from 'parse5';
 
 // Sitemap XML: https://www.sitemaps.org/protocol.html
@@ -172,13 +173,9 @@ async function readBounded(response: Response, signal: AbortSignal): Promise<str
   return new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks));
 }
 
-export async function discoverLatest(options: Options): Promise<DiscoveryResult> {
+function createGetter(options: Pick<Options, 'fetch' | 'pause'>) {
   const pause = options.pause ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
-  const now = options.now ?? Date.now;
-  const queue = [safeUrl(options.sitemapUrl, 'sitemap')];
-  const visited = new Set<string>();
-  const posts = new Map<string, string | undefined>();
-  const get = async (url: string) => {
+  return async (url: string) => {
     const previous = requestTail;
     let release!: () => void;
     requestTail = new Promise<void>(resolve => { release = resolve; });
@@ -202,6 +199,25 @@ export async function discoverLatest(options: Options): Promise<DiscoveryResult>
       } finally { if (timer) clearTimeout(timer); controller.abort(); }
     } finally { release(); }
   };
+}
+
+export async function fetchOasisArticle(expected: PostMetadata, options: Pick<Options, 'fetch' | 'pause'>): Promise<string> {
+  if (!expected || !validCachedPost(expected.url, expected)) throw new Error('Invalid article metadata');
+  const safe = safeUrl(expected.url, 'post');
+  const get = createGetter(options);
+  checkRobots(await get(`${ORIGIN}/robots.txt`));
+  const html = await get(safe);
+  const current = article(html, safe);
+  if (current.title !== expected.title || current.datePublished !== expected.datePublished) throw new Error('Article metadata changed');
+  return extractArticleText(html);
+}
+
+export async function discoverLatest(options: Options): Promise<DiscoveryResult> {
+  const now = options.now ?? Date.now;
+  const queue = [safeUrl(options.sitemapUrl, 'sitemap')];
+  const visited = new Set<string>();
+  const posts = new Map<string, string | undefined>();
+  const get = createGetter(options);
   if (options.checkRobots) checkRobots(await get(`${ORIGIN}/robots.txt`));
   while (queue.length) {
     const url = queue.shift()!;

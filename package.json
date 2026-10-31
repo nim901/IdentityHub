@@ -15,7 +15,8 @@
     "discover:blog": "npm run discover:blog --workspace server",
     "mock:atlassian": "npm run mock:atlassian --workspace server",
     "lint": "npm run lint --workspaces --if-present",
-    "test:e2e": "npm run build && tsx scripts/e2e.mts"
+    "test:e2e": "npm run build && tsx scripts/e2e.mts",
+    "preview:blog": "npm run preview:blog --workspace server"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

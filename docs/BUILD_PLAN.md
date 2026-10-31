@@ -102,7 +102,7 @@ Review security and isolation, fix findings, write setup and architecture docume
 
 Work one phase at a time. After each phase run tests, review the security requirements touched, report passing and unverified checks, and have the owner review the diff before its commit. Automated tests use fakes; the owner controls credentials, account setup, and live service writes. Record design decisions and dependency purposes as the project evolves.
 
-Scheduling, teams and roles, SSO, Jira webhooks, automatic reconciliation, a durable job queue, audit logs, and multi-region deployment are out of scope. The provider, model, and cost for the AI path remain to be chosen.
+Scheduling, teams and roles, SSO, Jira webhooks, automatic reconciliation, a durable job queue, audit logs, and multi-region deployment are out of scope. The OpenAI API adapter is implemented for the preview; the model and spending configuration are chosen by the operator. Direct ChatGPT plan authorization remains future work.
 
 ## UI foundation (merged, PR #3)
 
@@ -119,3 +119,8 @@ That phase introduced accessible tabs for the then-unavailable Jira and API-key 
 ## Backend review and security fixes (merged, PRs #6 and #7)
 
 The project-local Fastify reference and a review of existing authentication and session handling are available in `docs/BACKEND_REVIEW.md`. The identified cache policy and stalled session-check issues were fixed; the review predates provider integration.
+
+
+### Phase 6B status: summary preview
+
+The read-only preview composes discovery, a single-article text extractor, and a tool-free OpenAI API adapter. Fake-only tests cover the preview and failures. The article selector was checked against one public Oasis article; real model responses require owner-run verification; ChatGPT plan authorization, fallback, and Jira-writing digest orchestration remain future work.

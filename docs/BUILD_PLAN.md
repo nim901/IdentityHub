@@ -22,7 +22,7 @@ The browser calls only our API. Session-authenticated writes require a CSRF toke
 | `GET /api/findings?project=KEY` | Return this user's ten most recent app-created tickets for the selected project. |
 | API key management routes | Create, list, and revoke the user's keys and restrict each key to allowed projects. |
 | `POST /api/v1/findings` | Create a finding using `X-API-Key` and an optional `Idempotency-Key`. |
-| `npm run digest -- [--dry-run] [--require-ai]` | Select the newest blog post, summarize it, and optionally create a ticket. |
+| `npm run digest -- [--dry-run] [--require-ai] [--codex-cli]` | Select the newest blog post, summarize it, and optionally create a ticket. `--codex-cli` requires a local dry run. |
 
 The external API accepts `project`, `title` (1–255 characters), `description` (up to 20,000 characters), and optional `type`, `severity` and `resource`. Success returns `201`, `{ issueKey, url }`, and a `Location` header. Cover malformed JSON (400), invalid credentials (401), forbidden projects (403), missing Jira projects (404), conflicts (409), validation errors (422), rate limits (429), and safe upstream errors (502). Validation errors include field-level messages; rate limits include `Retry-After`.
 
@@ -129,3 +129,5 @@ The read-only preview composes discovery, a single-article text extractor, and a
 ### Phase 6C status: digest command
 
 The local command binds an existing configured user to their Jira connection, reuses the finding service, and reserves each user/post before a write. Dry runs skip reservations and Jira writes. Missing or failed AI uses a labeled extractive fallback with exit code 3 unless `--require-ai` is set. Pending and unknown outcomes block retries; a pending reservation older than 30 minutes is marked unknown on the next non-dry attempt. A definite Jira rejection or confirmed pre-write site mismatch permits retry. Live provider and Docker verification remain outstanding.
+
+The optional local Codex CLI dry run shares the API instructions and validation, requires ChatGPT CLI authentication, and fails instead of falling back. A live host dry run succeeded; it does not verify the API adapter or live Jira creation.

@@ -57,6 +57,8 @@ The callback consumes state before code exchange, so an upstream or storage fail
 
 ## AI digest and uncertain outcomes
 
+For local dry-run verification, an opt-in Codex CLI adapter can use a ChatGPT login without an API key. It preserves article discovery, the prompt, and output validation, but uses a different agent harness and does not prove the API request works. The read-only sandbox can read accessible local files and rejecting tool events happens after execution. Application credentials are excluded from its environment. The API remains the default for digest creation.
+
 A model can produce a more useful summary than an extractive fallback, but adds provider access, cost, latency, and untrusted-input risks. The preview uses the OpenAI API with an operator-supplied model and key; direct ChatGPT plan authorization is not yet implemented. Restrict the model to summarization, validate output, and clearly label fallback results as degraded.
 
 A database transaction cannot include the remote Jira request. Persisting pending, done, and unknown states reduces duplicate creates, but an uncertain outcome requires human investigation and can interrupt retries. This favors avoiding duplicate tickets over automatic recovery; reconciliation and durable queues are future work.

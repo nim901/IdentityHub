@@ -2,6 +2,12 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
+## Local Codex digest preview (in review)
+
+- Add an opt-in ChatGPT-authenticated Codex CLI dry run with shared summary instructions and validation, a limited child environment, and no extractive fallback. Jira-writing digest runs continue to use the API provider.
+- A live host dry run returned a non-degraded article summary. This does not verify the Responses API request. Codex may attempt tool calls despite read-only sandboxing; observed tool events are rejected after they occur. The CLI is not included in Docker.
+- The build and 12 focused summary and digest CLI tests passed with existing local dependencies. Docker build, startup, health, and container tests were not rerun for this change.
+
 ## Phase 6C - Digest command (in review)
 
 - Add the digest command, a per-user post reservation, dry runs, explicit degraded fallback, and a shared finding-service path. Pending or uncertain outcomes block retries; a definite Jira rejection permits retry.

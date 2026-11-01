@@ -4,13 +4,16 @@ import { JiraOAuth } from '../jira/oauth.js';
 import { JiraConnection } from '../jira/connection.js';
 import { FindingsService } from '../jira/findings.js';
 import { createOpenAiSummarizer } from '../ai/openai.js';
+import { createCodexSummarizer } from '../ai/codex.js';
 import { discoverOasis, fetchOasisArticle, MetadataCache } from './discovery.js';
 import { runDigest } from './command.js';
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.some(arg => !['--dry-run', '--require-ai'].includes(arg)) || new Set(args).size !== args.length) throw new Error('Invalid arguments');
-  const dryRun = args.includes('--dry-run'), requireAi = args.includes('--require-ai');
+  if (args.some(arg => !['--dry-run', '--require-ai', '--codex-cli'].includes(arg)) || new Set(args).size !== args.length) throw new Error('Invalid arguments');
+  const codexCli = args.includes('--codex-cli');
+  const dryRun = args.includes('--dry-run'), requireAi = args.includes('--require-ai') || codexCli;
+  if (codexCli && !dryRun) throw new Error('Codex CLI requires --dry-run');
   const email = process.env.DIGEST_USER_EMAIL, project = process.env.DIGEST_PROJECT_KEY;
   const path = process.env.DATABASE_PATH ?? 'app.db';
   if (!email || !project || !existsSync(path)) throw new Error('Missing digest configuration or database');
@@ -19,7 +22,8 @@ async function main() {
     const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as { id: string } | undefined;
     if (!user) throw new Error('Digest user not found');
     let summarize: ((text: string) => Promise<string>) | undefined;
-    if (process.env.AI_API_KEY && process.env.AI_MODEL) {
+    if (codexCli) summarize = createCodexSummarizer();
+    else if (process.env.AI_API_KEY && process.env.AI_MODEL) {
       try { summarize = createOpenAiSummarizer({ apiKey: process.env.AI_API_KEY, model: process.env.AI_MODEL, fetch: globalThis.fetch }); } catch { /* Treated as unavailable below. */ }
     }
     if (requireAi && !summarize) throw new Error('AI summary unavailable');
@@ -39,7 +43,7 @@ async function main() {
 }
 
 main().catch(error => {
-  const message = error instanceof Error && /^(?:Earlier digest outcome unresolved|Digest Jira outcome unknown|Jira created [A-Z][A-Z0-9_]{0,31}-[1-9][0-9]{0,19}, but (?:local|digest) recording failed|Jira rejected the digest|Jira site changed\. No issue was created|AI summary unavailable)/.test(error.message) ? error.message : 'Digest failed. Check configuration and provider availability.';
+  const message = error instanceof Error && /^(?:Codex CLI requires --dry-run|Earlier digest outcome unresolved|Digest Jira outcome unknown|Jira created [A-Z][A-Z0-9_]{0,31}-[1-9][0-9]{0,19}, but (?:local|digest) recording failed|Jira rejected the digest|Jira site changed\. No issue was created|AI summary unavailable)/.test(error.message) ? error.message : 'Digest failed. Check configuration and provider availability.';
   process.stderr.write(`${message}\n`);
   process.exitCode = 1;
 });

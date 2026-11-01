@@ -286,6 +286,9 @@ h2 {
 .section-heading h2 {
   margin: 0;
 }
+.section-heading {
+  flex-wrap: wrap;
+}
 .section-heading span,
 .composer-footer p {
   color: #606862;

@@ -76,6 +76,8 @@ Blog metadata caching is in memory, not a SQLite table. User-owned reads and wri
 
 ## UI foundation
 
+Returning to Findings or choosing Refresh reloads the current project’s locally recorded tickets. Refresh is disabled while loading or while the session or Jira destination is unavailable. The existing session checks, site-bound request and effect cleanup prevent an old result from replacing a newer selection.
+
 The signed-in shell uses a Radix dropdown for account actions. The browser calls only our authentication and Jira APIs; Jira requests remain behind the server boundary. Settings connects and selects a site, while Findings selects a discovered project.
 
 The reporting view keeps draft text in component memory until submission. It sends a session-bound request with one idempotency key, prevents parallel submissions, and does not automatically retry. Unknown outcomes require checking Jira before another attempt. The browser may suppress unload warnings; drafts and acknowledgment are lost on reload. Finding writes and history reads include the browser’s expected site ID; the API rejects a changed site before returning history or issuing a write. The optional field preserves compatibility for older API callers, which instead use their currently selected site. Recent-ticket reads carry the session binding token, wait for refreshed connection status on focus, and render results only for the current project and site. Unrecognized write responses are treated as uncertain.

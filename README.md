@@ -261,6 +261,8 @@ The signed-in interface includes a responsive account shell and an accessible ac
 
 The Findings view shows up to ten app-created tickets for the selected project. The reporting view keeps its draft in memory until submission and creates a Jira ticket through the API. Leaving with a nonempty draft prompts for confirmation. Browsers control the reload or tab-close warning and may suppress it, especially on mobile. Drafts are lost on reload or process termination. Views do not create browser history entries or support deep links.
 
+Recent tickets refresh when returning to Findings; use **Refresh** to reload the selected project's list while staying on the page. The control is unavailable until the Jira destination and session are ready. The list contains only issues recorded by IdentityHub.
+
 Settings supports Jira connection and site selection when the server is configured. When configuration is missing or invalid, the connection button remains disabled and setup guidance identifies the required server variables. A failed project lookup offers a retry. API key management can create, list, and revoke project-restricted keys; the scanner endpoint accepts these keys. Session checks on focus or visibility changes retain drafts on temporary failures and clear them on confirmed expiry or account changes. If sign-out fails, the application does not claim the server session ended.
 
 

@@ -2,6 +2,11 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
+## Recent ticket refresh
+
+- Reload recent tickets when returning to Findings and provide a manual Refresh action. Disable it until the session and destination are ready; retain the existing site and session isolation and retry behavior.
+- A fake-provider browser regression reproduced the stale list before the fix and passed afterward, including manual refresh, failed request and retry, a late response after project deselection, and a 320px overflow check. Build, lint and all 29 browser tests passed; the build emitted dependency warnings. The initial focused run timed out starting its server; it passed with a longer startup allowance. Docker was unavailable; live-provider and full accessibility verification were not performed.
+
 ## Documentation and onboarding refresh (PR pending)
 
 - Reorganize the README around Linux setup and common workflows, add onboarding and code-flow guides, describe the current database schema and architecture, and remove the obsolete backend review.

@@ -1,6 +1,6 @@
 # IdentityHub system design
 
-This diagram describes the planned end state. The current implementation includes the web account flow, authentication, session-bound Jira OAuth and encrypted credentials, site/project discovery, session-based finding creation and history, and a workspace shell with connection, site and project selection and local drafts; API key management and the finding UI are implemented; scanner authentication and the digest command are implemented.
+This document describes the implementation on this branch. For request paths and functions, see [code flow](CODE_FLOW.md); for configuration, see [onboarding](ONBOARDING.md). Verification status is recorded in the [changelog](../CHANGELOG.md).
 
 ```mermaid
 flowchart LR
@@ -13,8 +13,9 @@ flowchart LR
     Jira --> Atlassian[Atlassian OAuth and Jira]
     Digest[Digest command] --> Crawl[Blog discovery and parser]
     Crawl --> Oasis[Oasis blog]
-    Digest --> AI[Summarizer]
-    AI --> Model[Model provider]
+    Digest --> AI[OpenAI adapter]
+    AI --> Model[OpenAI Responses API]
+    Digest -->|dry run only| Codex[Local Codex CLI]
     Digest --> Services
     Digest --> DB
 ```
@@ -56,106 +57,22 @@ The standalone fake Atlassian service listens on loopback only and accepts a con
 
 The Jira boundary uses `jira.js` for authorization URLs and code exchange. The authenticated, CSRF-protected start route stores only a hash of a random state, bound to the user and session for ten minutes. The callback atomically consumes matching, unexpired state, exchanges the code, and stores encrypted tokens only if the initiating session remains valid. Session deletion removes its state. AES-256-GCM uses a random nonce and authenticates the user and token type; the 32-byte key is configured outside the database. Request logs omit query strings, and Jira responses use no-store and no-referrer. The token request is restricted to Atlassian's documented endpoint, rejects redirects, times out, and bounds response size. Tests use fake transports without network access. Refresh is single-flight per user in one server process; the database records an in-progress rotation before contacting Atlassian and requires reconnection after an uncertain outcome. Site selection and project discovery are scoped to the user. The status endpoint returns only configuration, saved connection state, and selected site for the authenticated session. The browser checks session identity around Jira requests and discards stale results. OAuth callback redirects use fixed local paths and do not include provider codes or state.
 
-The current account flow stores hashed session IDs and uses session-bound CSRF tokens. Jira tokens are encrypted at rest; API key secrets are shown once and stored as SHA-256 hashes with a short prefix. Keys retain the selected site and an explicit allowlist of project keys and discovered project IDs; scanner authentication enforces the stored project IDs against fresh Jira discovery and rejects legacy records without IDs. The planned digest will treat blog and model output as untrusted, fetch only allowed hosts, supply article text as data to a tool-free model, validate the response, and avoid storing article text. Real provider behavior requires separate owner verification; automated tests use fakes.
+The current account flow stores hashed session IDs and uses session-bound CSRF tokens. Jira tokens are encrypted at rest; API key secrets are shown once and stored as SHA-256 hashes with a short prefix. Keys retain the selected site and an explicit allowlist of project keys and discovered project IDs; scanner authentication enforces the stored project IDs against fresh Jira discovery and rejects legacy records without IDs. The digest treats blog and model output as untrusted, fetches only allowed hosts, validates responses, and avoids storing article text. The OpenAI API adapter supplies article text to a tool-free model; the separate Codex CLI adapter is an agent and can access files permitted by its sandbox. Real provider behavior requires separate owner verification; automated tests use fakes.
 
-## Planned SQLite schema
+## Current SQLite schema
 
-This is an illustrative target schema; users, sessions, OAuth states, encrypted Jira credentials, selected sites, issue history and idempotency reservations are implemented in migrations. The current implementation separates credentials and selected sites instead of the illustrative `jira_connections` table below. Migration files are authoritative for the current database. Timestamps are UTC ISO-8601 strings; IDs are opaque text values. Foreign keys must be enabled on every connection. Repositories must scope user-owned queries to the authenticated user even where a foreign key exists.
+The ordered SQL files in [`server/migrations/`](../server/migrations/) are authoritative. `openDatabase` enables foreign keys and applies unapplied migrations when the app or a digest command opens the database. The current tables are:
 
-```sql
-CREATE TABLE users (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  created_at TEXT NOT NULL
-);
+| Table | Purpose |
+| --- | --- |
+| `migrations` | Applied migration names. |
+| `users`, `sessions` | Account password hashes and user-bound hashed session identifiers, CSRF tokens, and expiry. |
+| `oauth_states`, `jira_credentials`, `jira_sites` | Session-bound OAuth state, encrypted rotating credentials and each user's selected Jira site. |
+| `finding_operations`, `created_issues` | Idempotency and uncertain-outcome state, and locally recorded user/site/project issue history. |
+| `api_keys` | Hashed API keys, owner, site, allowed project keys and IDs, and revocation metadata. |
+| `digest_posts` | Per-user/post digest reservation and issue result; no article body. |
 
-CREATE TABLE sessions (
-  id_hash TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id),
-  csrf_token TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  expires_at TEXT NOT NULL
-);
-
-CREATE TABLE jira_connections (
-  user_id TEXT PRIMARY KEY REFERENCES users(id),
-  cloud_id TEXT NOT NULL,
-  site_url TEXT NOT NULL,
-  site_name TEXT NOT NULL,
-  access_token_enc TEXT NOT NULL,
-  refresh_token_enc TEXT NOT NULL,
-  access_expires_at TEXT NOT NULL,
-  scopes TEXT NOT NULL
-);
-
-CREATE TABLE oauth_states (
-  state_hash TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id),
-  session_id_hash TEXT NOT NULL REFERENCES sessions(id_hash),
-  expires_at TEXT NOT NULL,
-  used_at TEXT
-);
-
-CREATE TABLE api_keys (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id),
-  name TEXT NOT NULL,
-  key_prefix TEXT NOT NULL,
-  key_hash TEXT NOT NULL UNIQUE,
-  site_id TEXT NOT NULL,
-  allowed_projects_json TEXT NOT NULL,
-  allowed_project_ids_json TEXT,
-  created_at TEXT NOT NULL,
-  last_used_at TEXT,
-  revoked_at TEXT,
-  UNIQUE (user_id, id)
-);
-
-CREATE TABLE created_issues (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id),
-  issue_key TEXT NOT NULL,
-  issue_id TEXT NOT NULL,
-  project_key TEXT NOT NULL,
-  title TEXT NOT NULL,
-  source TEXT NOT NULL,
-  api_key_id TEXT,
-  created_at TEXT NOT NULL,
-  FOREIGN KEY (user_id, api_key_id) REFERENCES api_keys(user_id, id)
-);
-CREATE INDEX created_issues_recent
-  ON created_issues(user_id, project_key, created_at DESC);
-
-CREATE TABLE idempotency_keys (
-  user_id TEXT NOT NULL REFERENCES users(id),
-  key_hash TEXT NOT NULL,
-  request_hash TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('pending', 'done', 'unknown')),
-  issue_key TEXT,
-  created_at TEXT NOT NULL,
-  PRIMARY KEY (user_id, key_hash)
-);
-
--- Global metadata cache; never store article text here.
-CREATE TABLE blog_posts (
-  url TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  date_published TEXT NOT NULL,
-  fetched_at TEXT NOT NULL
-);
-
-CREATE TABLE digest_posts (
-  user_id TEXT NOT NULL REFERENCES users(id),
-  post_url TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('pending', 'done', 'unknown')),
-  issue_key TEXT,
-  created_at TEXT NOT NULL,
-  PRIMARY KEY (user_id, post_url)
-);
-```
-
-The current application stores hashes of session IDs and encrypted Jira tokens in `jira_credentials`; the planned `jira_connections` table above describes the later site-discovery stage. The API-key management slice stores key hashes and site-bound project allowlists; the scanner authentication path is implemented. OAuth state belongs to both a user and session; application checks must enforce that association and expiry. `pending` and `unknown` records prevent automatic repeat creation when the remote outcome is uncertain. For sitemap caching, migrations may add a last-modified or equivalent change marker after the actual sitemap behavior is verified. Retention and cleanup of expired sessions and OAuth states should be implemented without weakening replay protection.
+Blog metadata caching is in memory, not a SQLite table. User-owned reads and writes are scoped to the authenticated user or key owner. Pending and unknown states prevent blind repeats of uncertain remote writes. SQLite and in-process queues, rate limits, and refresh coordination assume a single server process.
 
 ## UI foundation
 
@@ -191,6 +108,4 @@ The preview reuses the discovery request queue and robots preflight to retrieve 
 
 A local operator selects an existing account by configured email and a project key. The command captures the selected site at the start and passes it to the shared finding service, which rejects a site change before writing. It uses that account’s encrypted Jira connection. A per-user, per-post SQLite reservation is inserted before creation; done records prevent duplicates, while pending and unknown records block retry pending human review. A pending record older than 30 minutes is marked unknown on the next non-dry attempt. A confirmed Jira rejection or site mismatch before the write releases the reservation. This conservatively treats failures before the remote write as uncertain when their cause cannot be classified. Dry runs skip reservations and Jira writes, although database migrations can run. Fallback extracts bounded text, marks it degraded, and returns exit code 3; `--require-ai` fails instead. Only metadata and issue references are stored in the digest table.
 
-The opt-in Codex CLI dry-run adapter checks ChatGPT authentication, runs in a temporary directory with read-only sandboxing and an ephemeral session, ignores user configuration, and excludes application secrets and API keys from the child environment. It shares the API prompt and input/output bounds, enforces process time and output limits, and rejects observed tool events. Codex is not equivalent to the API's `tools: []`: a tool can execute before its event is rejected, and the sandbox can read accessible local files. Model behavior, retention, and provider requests differ. The CLI option cannot create a Jira issue and is not installed in the Docker image. See [Codex non-interactive mode](https://developers.openai.com/codex/noninteractive).
-
-The shared prompt requests a concise paragraph and up to five bullets, attribution of claims where appropriate, and no invented facts, action items, or promotional language. The application validates plain-text size and characters but does not enforce the requested format or factual accuracy.
+The optional `--codex-cli` dry-run adapter starts a local ChatGPT-authenticated Codex process in a temporary directory with a read-only sandbox, ephemeral session, ignored user config, and a small environment allowlist excluding app secrets and API keys. It shares the API adapter's instructions and input/output bounds, applies process time and output limits, and rejects observed tool events. Codex is an agent and a sandbox is not equivalent to the API's `tools: []`: a tool could execute before its event is rejected, and a read-only sandbox may read accessible local files. The article is untrusted; use this local option only in a suitably isolated environment. No Jira write is possible through this digest option. The CLI model, retention and provider request differ from the API; CLI success does not verify API compatibility. See [Codex non-interactive mode](https://developers.openai.com/codex/noninteractive).

@@ -7,6 +7,11 @@ Notable project changes are recorded by build phase. Entries describe what was d
 - Reload recent tickets when returning to Findings and provide a manual Refresh action. Disable it until the session and destination are ready; retain the existing site and session isolation and retry behavior.
 - A fake-provider browser regression reproduced the stale list before the fix and passed afterward, including manual refresh, failed request and retry, a late response after project deselection, and a 320px overflow check. Build, lint and all 29 browser tests passed; the build emitted dependency warnings. The initial focused run timed out starting its server; it passed with a longer startup allowance. Docker was unavailable; live-provider and full accessibility verification were not performed.
 
+## Documentation and onboarding refresh (PR pending)
+
+- Reorganize the README around Linux setup and common workflows, add onboarding and code-flow guides, describe the current database schema and architecture, and remove the obsolete backend review.
+- Verification: documentation checked against the branch implementation; local links and `git diff --check` checked. No application, Docker, Linux, or live-provider tests were run for this documentation-only change.
+
 ## Local Codex digest preview
 
 - Update the shared API and Codex prompt to request a concise paragraph, up to five bullets, attributed claims, and no invented details or promotional language. Format and factual accuracy remain subject to human review; the updated prompt has not been live-tested.
@@ -128,7 +133,7 @@ Merged in [PR #6](https://github.com/nim901/IdentityHub/pull/6).
 - Added a project-local third-party Fastify reference and reviewed the current authentication and session implementation. No backend features or contracts were changed.
 - The Fastify-assisted security review found that session responses containing account information and the CSRF token lack an explicit `Cache-Control: no-store` header, allowing clients or intermediaries to retain them depending on their caching behavior. The issue is documented for a separate fix; it has not been fixed in this phase.
 - Seven server tests and ten browser tests passed, and the browser run built the application. Docker and live-provider checks remain unverified.
-- Review findings and suggested follow-up tests are in `docs/BACKEND_REVIEW.md`.
+- The historical backend review recorded findings and suggested follow-up tests; see [system design](docs/SYSTEM_DESIGN.md) and [code flow](docs/CODE_FLOW.md) for the current implementation.
 
 ## Settings and session handling
 

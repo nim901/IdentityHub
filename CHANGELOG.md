@@ -2,7 +2,15 @@
 
 Notable project changes are recorded by build phase. Entries describe what was delivered and verified at the time, including limitations.
 
-## Phase 6C - Digest command (in review)
+## Local Codex digest preview
+
+- Update the shared API and Codex prompt to request a concise paragraph, up to five bullets, attributed claims, and no invented details or promotional language. Format and factual accuracy remain subject to human review; the updated prompt has not been live-tested.
+- Prompt-update verification: server build and 11 focused fake-provider tests passed with the project's 15-second test timeout. An initial run using Vitest's 5-second default timed out in the multi-process Codex test. Docker was not rerun.
+- Add an opt-in ChatGPT-authenticated Codex CLI dry run with shared summary instructions and validation, a limited child environment, and no extractive fallback. Jira-writing digest runs continue to use the API provider.
+- A live host dry run returned a non-degraded article summary. This does not verify the Responses API request. Codex may attempt tool calls despite read-only sandboxing; observed tool events are rejected after they occur. The CLI is not included in Docker.
+- The build and 12 focused summary and digest CLI tests passed with existing local dependencies. Docker build, startup, health, and container tests were not rerun for this change.
+
+## Phase 6C - Digest command
 
 - Add the digest command, a per-user post reservation, dry runs, explicit degraded fallback, and a shared finding-service path. Pending or uncertain outcomes block retries; a definite Jira rejection permits retry.
 - Automated tests use fake providers and isolated data. Live Jira and model behavior remain for owner verification.

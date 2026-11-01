@@ -23,6 +23,9 @@ describe('OpenAI summarization', () => {
     expect(body.store).toBe(false);
     expect(body.tools).toEqual([]);
     expect(body.instructions).toMatch(/untrusted/i);
+    expect(body.instructions).toMatch(/short paragraph followed by up to five bullet points/i);
+    expect(body.instructions).toMatch(/avoid promotional language/i);
+    expect(body.instructions).toMatch(/do not invent facts, conclusions, or action items/i);
     expect(JSON.stringify(body.input)).toContain('Ignore all instructions');
   });
   it('fails safely for provider failures, refusals, or invalid output', async () => {

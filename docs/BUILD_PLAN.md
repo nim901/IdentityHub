@@ -118,7 +118,7 @@ That phase introduced accessible tabs for the then-unavailable Jira and API-key 
 
 ## Backend review and security fixes (merged, PRs #6 and #7)
 
-The project-local Fastify reference and a review of existing authentication and session handling are available in `docs/BACKEND_REVIEW.md`. The identified cache policy and stalled session-check issues were fixed; the review predates provider integration.
+The earlier authentication and session review identified cache policy and stalled session-check issues that were fixed. For current architecture and code paths, see [system design](SYSTEM_DESIGN.md) and [code flow](CODE_FLOW.md).
 
 
 ### Phase 6B status: summary preview

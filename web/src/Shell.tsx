@@ -227,6 +227,7 @@ export function Shell({
       onSignOut();
     } else if (destination === "findings") {
       setFocusFindings(true);
+      setHistoryVersion((value) => value + 1);
       setView("findings");
     } else {
       setView("settings");
@@ -388,6 +389,13 @@ export function Shell({
             <div className="section-heading">
               <h2 id="recent-heading">Recent tickets</h2>
               <span>Latest 10 per project</span>
+              <button
+                className="text-button"
+                onClick={() => setHistoryVersion((value) => value + 1)}
+                disabled={!project || !jira?.site || Boolean(jiraError) || ticketsLoading || confirmedSessionRefresh !== sessionRefresh}
+              >
+                Refresh
+              </button>
             </div>
             <p className="subtitle">
               Tickets created by this app, not your entire Jira history.

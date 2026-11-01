@@ -74,7 +74,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The command builds the app and runs browser tests in seven groups, each with a separate local server and temporary SQLite database. Each group gets a fresh rate-limit state. The browser server uses fake Jira configuration and transport, including separate missing-configuration, invalid-key, and failed-exchange scenarios. It clears inherited Jira credentials and rejects unexpected provider requests. The databases are removed afterward; the tests do not use the Docker volume or your local app database. A forced process termination or machine crash may leave a temporary `identityhub-e2e-` folder in the system temporary directory.
+The command builds the app and runs browser tests in nine groups, each with a separate local server and temporary SQLite database. Each group gets a fresh rate-limit state. The browser server uses fake Jira configuration and transport, including separate missing-configuration, invalid-key, and failed-exchange scenarios. It clears inherited Jira credentials and rejects unexpected provider requests. The databases are removed afterward; the tests do not use the Docker volume or your local app database. A forced process termination or machine crash may leave a temporary `identityhub-e2e-` folder in the system temporary directory.
 
 To run tests inside Docker, including rebuilding the test image after changes:
 
@@ -144,6 +144,8 @@ The next phase is owner-run live verification of the Jira and digest flows. Real
 The signed-in interface includes a responsive account shell and an accessible account menu. The Jira connection, site and project selection, ticket creation, and recent history are connected to the API. The Radix Dropdown Menu dependency provides the account menu's keyboard and focus behavior; the interface uses custom CSS. The [build plan](docs/BUILD_PLAN.md) groups the UI and backend review as phase 2 and plans Jira connection for phase 3.
 
 The Findings view shows up to ten app-created tickets for the selected project. The reporting view keeps its draft in memory until submission and creates a Jira ticket through the API. Leaving with a nonempty draft prompts for confirmation. Browsers control the reload or tab-close warning and may suppress it, especially on mobile. Drafts are lost on reload or process termination. Views do not create browser history entries or support deep links.
+
+Recent tickets refresh when returning to Findings; use **Refresh** to reload the selected project's list while staying on the page. The control is unavailable until the Jira destination and session are ready. The list contains only issues recorded by IdentityHub.
 
 Settings supports Jira connection and site selection when the server is configured. When configuration is missing or invalid, the connection button remains disabled and setup guidance identifies the required server variables. A failed project lookup offers a retry. API key management can create, list, and revoke project-restricted keys; the scanner endpoint accepts these keys. Session checks on focus or visibility changes retain drafts on temporary failures and clear them on confirmed expiry or account changes. If sign-out fails, the application does not claim the server session ended.
 
